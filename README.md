@@ -11,11 +11,17 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Planning is complete. Application implementation has not started.
+Planning and Milestone 0 are complete. The repository contains the pinned
+toolchain, solution/test scaffolding, a working WASAPI microphone probe, and
+measured local Whisper benchmarks. Product workflow implementation starts in
+Milestone 1 after review.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the proposed
 architecture, milestones, unit and regression tests, privacy constraints, and
 release criteria.
+
+See the [Milestone 0 results](docs/MILESTONE_0_RESULTS.md) for the target-machine
+measurements and model decision.
 
 ## Initial target
 
@@ -24,6 +30,27 @@ release criteria.
 - WPF desktop application
 - Local Whisper speech recognition
 - Self-contained, non-administrator installation
+
+## Development
+
+Install the pinned repository-local SDK, then run a clean restore, build, and
+test:
+
+```powershell
+.\scripts\Install-DotNet.ps1
+.\scripts\Test.ps1 -Clean
+```
+
+Optional Milestone 0 hardware checks:
+
+```powershell
+.\scripts\Invoke-AudioProbe.ps1
+.\scripts\Download-Models.ps1
+.\scripts\Invoke-Milestone0Benchmark.ps1
+```
+
+Speech models, the local SDK, NuGet caches, and generated benchmark output are
+excluded from Git.
 
 ## License
 

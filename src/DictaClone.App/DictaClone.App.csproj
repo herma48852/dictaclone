@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22000.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DictaClone.Audio/DictaClone.Audio.csproj" />
+    <ProjectReference Include="../DictaClone.Core/DictaClone.Core.csproj" />
+    <ProjectReference Include="../DictaClone.Infrastructure/DictaClone.Infrastructure.csproj" />
+    <ProjectReference Include="../DictaClone.Speech/DictaClone.Speech.csproj" />
+    <ProjectReference Include="../DictaClone.Text/DictaClone.Text.csproj" />
+    <ProjectReference Include="../DictaClone.Windows/DictaClone.Windows.csproj" />
+  </ItemGroup>
+</Project>

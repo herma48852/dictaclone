@@ -1,0 +1,21 @@
+# Local SDK and IDE state
+/.dotnet/
+/.cli-home/
+/.nuget/
+/.vs/
+*.user
+*.suo
+
+# .NET build and test output
+**/bin/
+**/obj/
+/artifacts/
+/TestResults/
+BenchmarkDotNet.Artifacts/
+
+# Downloaded speech models
+/models/
+
+# Operating-system files
+Thumbs.db
+.DS_Store

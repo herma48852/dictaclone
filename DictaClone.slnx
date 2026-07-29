@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DictaClone.App/DictaClone.App.csproj" />
+    <Project Path="src/DictaClone.Audio/DictaClone.Audio.csproj" />
+    <Project Path="src/DictaClone.Core/DictaClone.Core.csproj" />
+    <Project Path="src/DictaClone.Infrastructure/DictaClone.Infrastructure.csproj" />
+    <Project Path="src/DictaClone.Speech/DictaClone.Speech.csproj" />
+    <Project Path="src/DictaClone.Text/DictaClone.Text.csproj" />
+    <Project Path="src/DictaClone.Windows/DictaClone.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DictaClone.Audio.Tests/DictaClone.Audio.Tests.csproj" />
+    <Project Path="tests/DictaClone.Core.Tests/DictaClone.Core.Tests.csproj" />
+    <Project Path="tests/DictaClone.EndToEndTests/DictaClone.EndToEndTests.csproj" />
+    <Project Path="tests/DictaClone.IntegrationTests/DictaClone.IntegrationTests.csproj" />
+    <Project Path="tests/DictaClone.Speech.Tests/DictaClone.Speech.Tests.csproj" />
+    <Project Path="tests/DictaClone.TestTarget/DictaClone.TestTarget.csproj" />
+    <Project Path="tests/DictaClone.Windows.Tests/DictaClone.Windows.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/DictaClone.DevTools/DictaClone.DevTools.csproj" />
+  </Folder>
+</Solution>
