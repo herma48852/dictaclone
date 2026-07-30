@@ -14,6 +14,7 @@
     <Project Path="tests/DictaClone.EndToEndTests/DictaClone.EndToEndTests.csproj" />
     <Project Path="tests/DictaClone.IntegrationTests/DictaClone.IntegrationTests.csproj" />
     <Project Path="tests/DictaClone.Speech.Tests/DictaClone.Speech.Tests.csproj" />
+    <Project Path="tests/DictaClone.Text.Tests/DictaClone.Text.Tests.csproj" />
     <Project Path="tests/DictaClone.TestTarget/DictaClone.TestTarget.csproj" />
     <Project Path="tests/DictaClone.Windows.Tests/DictaClone.Windows.Tests.csproj" />
   </Folder>

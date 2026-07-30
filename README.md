@@ -11,10 +11,11 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Planning and Milestone 0 are complete. The repository contains the pinned
-toolchain, solution/test scaffolding, a working WASAPI microphone probe, and
-measured local Whisper benchmarks. Product workflow implementation starts in
-Milestone 1 after review.
+Planning, Milestone 0, and Milestone 1 are complete. The repository contains the
+pinned toolchain, solution/test scaffolding, a working WASAPI microphone probe,
+measured local Whisper benchmarks, and the platform-neutral dictation workflow,
+settings, hotkey, and deterministic text-processing core. Milestone 2 (tray UI,
+status overlay, and global hooks) remains paused for review.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the proposed
 architecture, milestones, unit and regression tests, privacy constraints, and
@@ -22,6 +23,9 @@ release criteria.
 
 See the [Milestone 0 results](docs/MILESTONE_0_RESULTS.md) for the target-machine
 measurements and model decision.
+
+See the [Milestone 1 results](docs/MILESTONE_1_RESULTS.md) for the workflow,
+settings, text pipeline, test, and coverage results.
 
 ## Initial target
 
@@ -39,6 +43,12 @@ test:
 ```powershell
 .\scripts\Install-DotNet.ps1
 .\scripts\Test.ps1 -Clean
+```
+
+Run the enforced Core coverage gate with:
+
+```powershell
+.\scripts\Test.ps1 -Clean -Coverage
 ```
 
 Optional Milestone 0 hardware checks:

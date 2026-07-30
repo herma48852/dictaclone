@@ -5,7 +5,10 @@ param(
 
     [switch] $Clean,
 
-    [switch] $Coverage
+    [switch] $Coverage,
+
+    [ValidateRange(0, 100)]
+    [double] $MinimumCoreLineCoverage = 90
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +16,7 @@ $ErrorActionPreference = 'Stop'
 
 $dotNet = Get-RepositoryDotNet
 $solution = Join-Path $script:RepositoryRoot 'DictaClone.slnx'
+$coverageResultsDirectory = $null
 
 Push-Location $script:RepositoryRoot
 
@@ -35,12 +39,25 @@ try {
     )
 
     if ($Coverage) {
+        $coverageRunName = 'coverage-{0:yyyyMMdd-HHmmss}-{1}' -f `
+            (Get-Date), `
+            [guid]::NewGuid().ToString('N')
+        $coverageResultsDirectory = Join-Path `
+            $script:RepositoryRoot `
+            (Join-Path 'TestResults' $coverageRunName)
         $testArguments += '--collect:XPlat Code Coverage'
         $testArguments += '--results-directory'
-        $testArguments += (Join-Path $script:RepositoryRoot 'TestResults')
+        $testArguments += $coverageResultsDirectory
     }
 
     Invoke-CheckedCommand $dotNet @testArguments
+
+    if ($Coverage) {
+        & (Join-Path $PSScriptRoot 'Assert-Coverage.ps1') `
+            -ResultsDirectory $coverageResultsDirectory `
+            -AssemblyName 'DictaClone.Core' `
+            -MinimumLinePercent $MinimumCoreLineCoverage
+    }
 }
 finally {
     Pop-Location
