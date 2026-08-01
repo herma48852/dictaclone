@@ -52,6 +52,7 @@ public sealed class AppController : IAsyncDisposable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _hotkeys.Triggered += HotkeysTriggered;

@@ -42,9 +42,12 @@ public sealed class LiveDictationControllerTests
             [
                 OverlayStatus.Recording,
                 OverlayStatus.Processing,
+                OverlayStatus.Processing,
                 OverlayStatus.Success,
             ],
             overlay.Statuses);
+        Assert.Equal("Finishing microphone…", overlay.Messages[1]);
+        Assert.Equal("Transcribing locally…", overlay.Messages[2]);
         Assert.Equal([0.4], overlay.Levels);
         Assert.True(session.StopCalled);
         Assert.True(session.Disposed);

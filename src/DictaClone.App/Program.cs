@@ -42,35 +42,24 @@ internal static class Program
             AppController? controller = null;
             int exitCode = 0;
 
-            application.Startup += (_, _) =>
+            application.Startup += async (_, _) =>
             {
                 try
                 {
                     controller = new(
                         application,
                         enableModelWarmup: !smokeTest);
-                    controller.StartAsync(CancellationToken.None)
-                        .GetAwaiter()
-                        .GetResult();
+                    await controller.StartAsync(CancellationToken.None);
 
                     if (smokeTest)
                     {
-                        _ = application.Dispatcher.BeginInvoke(
-                            DispatcherPriority.ApplicationIdle,
-                            () =>
-                            {
-                                try
-                                {
-                                    controller.DisposeAsync()
-                                        .AsTask()
-                                        .GetAwaiter()
-                                        .GetResult();
-                                }
-                                finally
-                                {
-                                    application.Shutdown();
-                                }
-                            });
+                        await application.Dispatcher.InvokeAsync(
+                            () => { },
+                            DispatcherPriority.ApplicationIdle);
+                        await DisposeAndShutdownAsync(
+                            application,
+                            controller,
+                            exitCode);
                     }
                 }
                 catch (Exception exception)
@@ -81,7 +70,10 @@ internal static class Program
                         ShowStartupError(exception);
                     }
 
-                    QueueShutdown(application, exitCode);
+                    await DisposeAndShutdownAsync(
+                        application,
+                        controller,
+                        exitCode);
                 }
             };
             application.DispatcherUnhandledException += (_, eventArgs) =>
@@ -93,7 +85,10 @@ internal static class Program
                     ShowUnhandledError(eventArgs);
                 }
 
-                application.Shutdown(exitCode);
+                _ = DisposeAndShutdownAsync(
+                    application,
+                    controller,
+                    exitCode);
             };
 
             try
@@ -109,13 +104,26 @@ internal static class Program
         }
     }
 
-    private static void QueueShutdown(
+    private static async Task DisposeAndShutdownAsync(
         WpfApplication application,
+        AppController? controller,
         int exitCode)
     {
-        _ = application.Dispatcher.BeginInvoke(
-            DispatcherPriority.ApplicationIdle,
-            () => application.Shutdown(exitCode));
+        try
+        {
+            if (controller is not null)
+            {
+                await controller.DisposeAsync();
+            }
+        }
+        catch (Exception)
+        {
+            // Process shutdown releases resources that could not be disposed.
+        }
+        finally
+        {
+            application.Shutdown(exitCode);
+        }
     }
 
     private static void ShowStartupError(Exception exception)

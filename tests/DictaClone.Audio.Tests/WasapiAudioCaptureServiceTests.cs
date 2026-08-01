@@ -1,5 +1,6 @@
 using DictaClone.Audio;
 using DictaClone.Core.Contracts;
+using DictaClone.Core.Dictation;
 using DictaClone.Core.Settings;
 using NAudio.Wave;
 
@@ -33,6 +34,52 @@ public sealed class WasapiAudioCaptureServiceTests
     }
 
     [Fact]
+    public async Task Capture_IsCreatedWithoutTheCallingSynchronizationContext()
+    {
+        var native = new FakeNativeCapture();
+        var factory = new FakeCaptureFactory(native);
+        var service = new WasapiAudioCaptureService(factory);
+        var startReturned = new TaskCompletionSource<
+            Task<IAudioCaptureSession>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        var callingThread = new Thread(() =>
+        {
+            SynchronizationContext? previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(new());
+            try
+            {
+                startReturned.TrySetResult(service.StartAsync(
+                    DefaultSettings,
+                    CancellationToken.None));
+            }
+            catch (Exception exception)
+            {
+                startReturned.TrySetException(exception);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+        })
+        {
+            IsBackground = true,
+        };
+        callingThread.Start();
+
+        Task<IAudioCaptureSession> starting = await startReturned.Task
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        IAudioCaptureSession session = await starting
+            .WaitAsync(TimeSpan.FromSeconds(2));
+
+        await using (session)
+        {
+            await session.CancelAsync(CancellationToken.None);
+        }
+
+        Assert.Null(factory.CreationSynchronizationContext);
+    }
+
+    [Fact]
     public async Task Capture_ReportsLevelsAndReturnsInMemoryWhisperAudio()
     {
         var native = new FakeNativeCapture();
@@ -57,6 +104,82 @@ public sealed class WasapiAudioCaptureServiceTests
         AudioLevelChangedEvent level = Assert.Single(levels);
         Assert.InRange(level.RootMeanSquare, 0.49, 0.51);
         Assert.InRange(level.Peak, 0.49, 0.51);
+    }
+
+    [Fact]
+    public async Task Stop_DoesNotBlockFinalCaptureCallbackOnSessionLock()
+    {
+        var native = new FakeNativeCapture
+        {
+            SynchronizeDataCallbackDuringStop = true,
+        };
+        var service = new WasapiAudioCaptureService(
+            new FakeCaptureFactory(native));
+        await using IAudioCaptureSession session = await service.StartAsync(
+            DefaultSettings,
+            CancellationToken.None);
+        native.Emit(CreatePcm16(
+            sampleCount: 4_000,
+            sample: short.MaxValue / 2));
+
+        CapturedAudio audio = await session
+            .StopAsync(CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(audio.IsSilent);
+        Assert.Equal(1, native.StopCount);
+    }
+
+    [Fact]
+    public async Task Stop_YieldsWhileNativeShutdownIsBlocked()
+    {
+        var native = new FakeNativeCapture
+        {
+            BlockStopUntilReleased = true,
+        };
+        var service = new WasapiAudioCaptureService(
+            new FakeCaptureFactory(native));
+        await using IAudioCaptureSession session = await service.StartAsync(
+            DefaultSettings,
+            CancellationToken.None);
+        native.Emit(CreatePcm16(
+            sampleCount: 4_000,
+            sample: short.MaxValue / 2));
+
+        var stopReturned = new TaskCompletionSource<Task<CapturedAudio>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var callingThread = new Thread(() =>
+        {
+            try
+            {
+                stopReturned.TrySetResult(
+                    session.StopAsync(CancellationToken.None));
+            }
+            catch (Exception exception)
+            {
+                stopReturned.TrySetException(exception);
+            }
+        })
+        {
+            IsBackground = true,
+        };
+        callingThread.Start();
+        await native.StopEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Task<CapturedAudio> stopping;
+        try
+        {
+            stopping = await stopReturned.Task
+                .WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.False(stopping.IsCompleted);
+        }
+        finally
+        {
+            native.ReleaseStop();
+        }
+
+        CapturedAudio audio = await stopping.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.False(audio.IsSilent);
     }
 
     [Fact]
@@ -157,9 +280,16 @@ public sealed class WasapiAudioCaptureServiceTests
 
         public List<string?> RequestedDeviceIds { get; } = [];
 
+        public SynchronizationContext? CreationSynchronizationContext
+        {
+            get;
+            private set;
+        }
+
         public INativeAudioCapture Create(string? deviceId)
         {
             RequestedDeviceIds.Add(deviceId);
+            CreationSynchronizationContext = SynchronizationContext.Current;
             return _captures.Dequeue();
         }
     }
@@ -173,6 +303,8 @@ public sealed class WasapiAudioCaptureServiceTests
     private sealed class FakeNativeCapture : INativeAudioCapture
     {
         private bool _stopped;
+        private readonly TaskCompletionSource _releaseStop = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
 
         public WaveFormat WaveFormat { get; } =
             new(16_000, bits: 16, channels: 1);
@@ -183,6 +315,13 @@ public sealed class WasapiAudioCaptureServiceTests
 
         public bool IsDisposed { get; private set; }
 
+        public bool SynchronizeDataCallbackDuringStop { get; init; }
+
+        public bool BlockStopUntilReleased { get; init; }
+
+        public TaskCompletionSource StopEntered { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
         public event EventHandler<NativeAudioDataEventArgs>? DataAvailable;
 
         public event EventHandler<NativeAudioStoppedEventArgs>? RecordingStopped;
@@ -192,8 +331,27 @@ public sealed class WasapiAudioCaptureServiceTests
         public void StopRecording()
         {
             StopCount++;
+            StopEntered.TrySetResult();
+            if (BlockStopUntilReleased)
+            {
+                _releaseStop.Task.GetAwaiter().GetResult();
+            }
+
             if (!_stopped)
             {
+                if (SynchronizeDataCallbackDuringStop)
+                {
+                    Task finalCallback = Task.Run(() =>
+                        DataAvailable?.Invoke(
+                            this,
+                            new(CreatePcm16(sampleCount: 1, sample: 0))));
+                    if (!finalCallback.Wait(TimeSpan.FromSeconds(1)))
+                    {
+                        throw new TimeoutException(
+                            "The final capture callback was blocked.");
+                    }
+                }
+
                 _stopped = true;
                 RecordingStopped?.Invoke(this, new(exception: null));
             }
@@ -207,6 +365,8 @@ public sealed class WasapiAudioCaptureServiceTests
             _stopped = true;
             RecordingStopped?.Invoke(this, new(exception));
         }
+
+        public void ReleaseStop() => _releaseStop.TrySetResult();
 
         public void Dispose() => IsDisposed = true;
     }

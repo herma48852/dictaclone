@@ -21,11 +21,23 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
             throw new ArgumentNullException(nameof(captureFactory));
     }
 
-    public Task<IAudioCaptureSession> StartAsync(
+    public async Task<IAudioCaptureSession> StartAsync(
         AudioSettings settings,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await Task.Run(
+                () => StartCaptureSession(settings, cancellationToken),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
+    private WasapiAudioCaptureSession StartCaptureSession(
+        AudioSettings settings,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         INativeAudioCapture capture;
@@ -43,8 +55,9 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
         var session = new WasapiAudioCaptureSession(capture, settings);
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             session.Start();
-            return Task.FromResult<IAudioCaptureSession>(session);
+            return session;
         }
         catch
         {
@@ -107,11 +120,23 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
             CancellationToken cancellationToken)
         {
             Task<CapturedAudio> stopTask;
+            TaskCompletionSource<CapturedAudio>? stopCompletion = null;
             lock (_sync)
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
-                _stopTask ??= CompleteStopAsync();
+                if (_stopTask is null)
+                {
+                    stopCompletion = new(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    _stopTask = stopCompletion.Task;
+                }
+
                 stopTask = _stopTask;
+            }
+
+            if (stopCompletion is not null)
+            {
+                _ = CompleteStopAndPublishAsync(stopCompletion);
             }
 
             return await stopTask
@@ -122,6 +147,7 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
         public async Task CancelAsync(CancellationToken cancellationToken)
         {
             Task<CapturedAudio> stopTask;
+            TaskCompletionSource<CapturedAudio>? stopCompletion = null;
             lock (_sync)
             {
                 if (_disposed)
@@ -130,8 +156,19 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
                 }
 
                 _discardAudio = true;
-                _stopTask ??= CompleteStopAsync();
+                if (_stopTask is null)
+                {
+                    stopCompletion = new(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    _stopTask = stopCompletion.Task;
+                }
+
                 stopTask = _stopTask;
+            }
+
+            if (stopCompletion is not null)
+            {
+                _ = CompleteStopAndPublishAsync(stopCompletion);
             }
 
             try
@@ -191,22 +228,47 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
             _disposed = true;
         }
 
+        private async Task CompleteStopAndPublishAsync(
+            TaskCompletionSource<CapturedAudio> stopCompletion)
+        {
+            try
+            {
+                CapturedAudio audio = await CompleteStopAsync()
+                    .ConfigureAwait(false);
+                stopCompletion.TrySetResult(audio);
+            }
+            catch (OperationCanceledException exception)
+            {
+                stopCompletion.TrySetCanceled(exception.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                stopCompletion.TrySetException(exception);
+            }
+        }
+
         private async Task<CapturedAudio> CompleteStopAsync()
         {
-            RequestStop();
             Exception? captureException;
+            using var stopTimeout = new CancellationTokenSource(StopTimeout);
 
             try
             {
+                await Task.Run(RequestStop)
+                    .WaitAsync(stopTimeout.Token)
+                    .ConfigureAwait(false);
                 captureException = await _recordingStopped.Task
-                    .WaitAsync(StopTimeout)
+                    .WaitAsync(stopTimeout.Token)
                     .ConfigureAwait(false);
             }
-            catch (TimeoutException exception)
+            catch (OperationCanceledException exception)
+                when (stopTimeout.IsCancellationRequested)
             {
                 throw new AudioCaptureDeviceException(
                     "The microphone did not stop within five seconds.",
-                    exception);
+                    new TimeoutException(
+                        "Native microphone shutdown timed out.",
+                        exception));
             }
 
             await _durationCancellation.CancelAsync().ConfigureAwait(false);

@@ -238,7 +238,7 @@ public sealed class LiveDictationController : IAsyncDisposable
 
         Post(() => _overlay.ShowStatus(
             OverlayStatus.Processing,
-            "Transcribing locally…"));
+            "Finishing microphone…"));
 
         try
         {
@@ -253,6 +253,10 @@ public sealed class LiveDictationController : IAsyncDisposable
                     "No speech detected"));
                 return;
             }
+
+            Post(() => _overlay.ShowStatus(
+                OverlayStatus.Processing,
+                "Transcribing locally…"));
 
             TranscriptionSettings transcriptionSettings =
                 settings.Transcription with
