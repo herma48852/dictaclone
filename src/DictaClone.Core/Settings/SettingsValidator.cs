@@ -79,6 +79,14 @@ public static class SettingsValidator
                 "range",
                 "Worker threads must be automatic (0) or between 1 and 64."));
         }
+
+        if (settings.InitialPrompt?.Length > 2048)
+        {
+            errors.Add(new(
+                "Transcription.InitialPrompt",
+                "length",
+                "The initial prompt cannot exceed 2,048 characters."));
+        }
     }
 
     private static void ValidateText(

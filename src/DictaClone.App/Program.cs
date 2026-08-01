@@ -46,7 +46,9 @@ internal static class Program
             {
                 try
                 {
-                    controller = new(application);
+                    controller = new(
+                        application,
+                        enableModelWarmup: !smokeTest);
                     controller.StartAsync(CancellationToken.None)
                         .GetAwaiter()
                         .GetResult();

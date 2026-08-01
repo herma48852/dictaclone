@@ -112,5 +112,9 @@ public sealed class TriggerUiControllerTests
         public void HideStatus()
         {
         }
+
+        public void UpdateLevel(double level)
+        {
+        }
     }
 }

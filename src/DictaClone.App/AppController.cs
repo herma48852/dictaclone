@@ -1,8 +1,12 @@
 using System.Collections.Immutable;
 using System.Windows;
 using DictaClone.App.Presentation;
+using DictaClone.Audio;
 using DictaClone.Core.Contracts;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Settings;
+using DictaClone.Speech;
+using DictaClone.Text;
 using DictaClone.Windows.Input;
 using WpfApplication = System.Windows.Application;
 
@@ -13,20 +17,36 @@ public sealed class AppController : IAsyncDisposable
     private readonly WpfApplication _application;
     private readonly LowLevelHotkeySource _hotkeys;
     private readonly StatusOverlayWindow _overlay;
-    private readonly TriggerUiController _triggerUi;
+    private readonly WhisperTranscriptionEngine _transcription;
+    private readonly LiveDictationController _dictationUi;
     private readonly TrayIconService _trayIcon;
     private ImmutableArray<HotkeyBinding> _bindings;
+    private DictaCloneSettings _settings;
     private SettingsWindow? _settingsWindow;
+    private readonly bool _enableModelWarmup;
     private bool _disposed;
 
-    public AppController(WpfApplication application)
+    public AppController(
+        WpfApplication application,
+        bool enableModelWarmup = true)
     {
         _application = application ??
             throw new ArgumentNullException(nameof(application));
-        _bindings = HotkeyDefaults.Bindings;
+        _enableModelWarmup = enableModelWarmup;
+        _settings = DictaCloneSettings.Default;
+        _bindings = _settings.Hotkeys;
         _hotkeys = new();
         _overlay = new();
-        _triggerUi = new(_overlay);
+        var modelManager = new WhisperModelManager(
+            WhisperModelStorage.ResolveDefaultDirectory());
+        _transcription = new(modelManager, ownsModelManager: true);
+        _dictationUi = new(
+            new WasapiAudioCaptureService(),
+            _transcription,
+            new DeterministicTextProcessor(),
+            _overlay,
+            _settings,
+            PostToUi);
         _trayIcon = new();
     }
 
@@ -41,12 +61,38 @@ public sealed class AppController : IAsyncDisposable
             .StartAsync(_bindings, cancellationToken)
             .ConfigureAwait(true);
 
+        bool warmed = !_enableModelWarmup;
+        if (_enableModelWarmup)
+        {
+            try
+            {
+                _overlay.ShowStatus(
+                    OverlayStatus.Processing,
+                    "Preparing local speech model…");
+                warmed = await _transcription
+                    .WarmUpIfAvailableAsync(
+                        _settings.Transcription,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (Exception)
+            {
+                _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Speech model warm-up failed");
+            }
+        }
+
         _overlay.ShowStatus(
             OverlayStatus.Success,
-            "✓  DictaClone is ready");
+            warmed
+                ? "✓  DictaClone is ready"
+                : "✓  Ready; model prepares on first use");
         _trayIcon.ShowNotification(
             "DictaClone is running",
-            "Hold Ctrl+Win to test the global shortcut overlay.");
+            warmed
+                ? "Hold Ctrl+Win+Space to start local dictation."
+                : "Hold Ctrl+Win+Space; the local model will be prepared on first use.");
     }
 
     public async ValueTask DisposeAsync()
@@ -67,11 +113,18 @@ public sealed class AppController : IAsyncDisposable
         }
         finally
         {
-            _settingsWindow?.Close();
-            _settingsWindow = null;
-            _triggerUi.Dispose();
-            _overlay.Close();
-            _trayIcon.Dispose();
+            try
+            {
+                await _dictationUi.DisposeAsync().ConfigureAwait(true);
+            }
+            finally
+            {
+                await _transcription.DisposeAsync().ConfigureAwait(true);
+                _settingsWindow?.Close();
+                _settingsWindow = null;
+                _overlay.Close();
+                _trayIcon.Dispose();
+            }
         }
     }
 
@@ -79,7 +132,7 @@ public sealed class AppController : IAsyncDisposable
     {
         try
         {
-            await _triggerUi.HandleAsync(inputEvent);
+            await _dictationUi.HandleAsync(inputEvent);
         }
         catch (Exception)
         {
@@ -110,8 +163,24 @@ public sealed class AppController : IAsyncDisposable
     {
         if (_settingsWindow is null)
         {
-            _settingsWindow = new(_bindings);
+            IReadOnlyList<MicrophoneDeviceInfo> devices;
+            try
+            {
+                devices = WasapiAudioDeviceService.GetActiveCaptureDevices();
+            }
+            catch (Exception)
+            {
+                devices = [];
+            }
+
+            _settingsWindow = new(
+                _bindings,
+                _settings.Audio,
+                _settings.Transcription,
+                devices);
             _settingsWindow.BindingsChanged += BindingsChanged;
+            _settingsWindow.AudioSpeechSettingsChanged +=
+                AudioSpeechSettingsChanged;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
             return;
@@ -142,7 +211,13 @@ public sealed class AppController : IAsyncDisposable
             await _hotkeys.StartAsync(
                 eventArgs.Bindings,
                 CancellationToken.None);
+            DictaCloneSettings updated = _settings with
+            {
+                Hotkeys = eventArgs.Bindings,
+            };
+            await _dictationUi.UpdateSettingsAsync(updated);
             _bindings = eventArgs.Bindings;
+            _settings = updated;
             _overlay.ShowStatus(
                 OverlayStatus.Success,
                 "✓  Shortcuts updated");
@@ -187,5 +262,64 @@ public sealed class AppController : IAsyncDisposable
                 "Exit and restart DictaClone to restore the global hook.",
                 System.Windows.Forms.ToolTipIcon.Error);
         }
+    }
+
+    private async void AudioSpeechSettingsChanged(
+        object? sender,
+        AudioSpeechSettingsChangedEventArgs eventArgs)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        DictaCloneSettings updated = _settings with
+        {
+            Audio = eventArgs.Audio,
+            Transcription = eventArgs.Transcription,
+        };
+
+        try
+        {
+            await _dictationUi.UpdateSettingsAsync(updated);
+            _settings = updated;
+            _overlay.ShowStatus(
+                OverlayStatus.Success,
+                "✓  Audio settings updated");
+        }
+        catch (Exception)
+        {
+            _overlay.ShowStatus(
+                OverlayStatus.Failure,
+                "Finish the active dictation before changing audio settings");
+        }
+    }
+
+    private void PostToUi(Action action)
+    {
+        void ExecuteSafely()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                action();
+            }
+            catch (InvalidOperationException)
+            {
+                // A queued UI update can race window shutdown.
+            }
+        }
+
+        if (_application.Dispatcher.CheckAccess())
+        {
+            ExecuteSafely();
+            return;
+        }
+
+        _ = _application.Dispatcher.BeginInvoke(ExecuteSafely);
     }
 }

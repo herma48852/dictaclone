@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Threading;
 using DictaClone.App.Presentation;
+using DictaClone.Audio;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Settings;
 
 namespace DictaClone.App.Tests;
 
@@ -46,6 +48,42 @@ public sealed class WindowConfigurationTests
             Assert.Equal(
                 HotkeyDefaults.Bindings.ToArray(),
                 window.Bindings.ToArray());
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public async Task SettingsWindow_LoadsRuntimeAudioAndSpeechChoices()
+    {
+        await RunOnStaAsync(() =>
+        {
+            AudioSettings audio = DictaCloneSettings.Default.Audio with
+            {
+                DeviceId = "microphone-2",
+                SilenceThreshold = 0.025,
+            };
+            TranscriptionSettings transcription =
+                DictaCloneSettings.Default.Transcription with
+                {
+                    Model = "small.en",
+                    Language = "auto",
+                };
+            var devices = new[]
+            {
+                new MicrophoneDeviceInfo(
+                    "microphone-2",
+                    "Test microphone",
+                    IsDefault: false),
+            };
+            var window = new SettingsWindow(
+                HotkeyDefaults.Bindings,
+                audio,
+                transcription,
+                devices);
+
+            Assert.Equal(audio, window.Audio);
+            Assert.Equal(transcription, window.Transcription);
 
             window.Close();
         });

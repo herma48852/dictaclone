@@ -217,7 +217,9 @@ public static class HotkeyDefaults
     [
         new(
             HotkeyAction.Dictation,
-            new HotkeyChord(HotkeyModifiers.Control | HotkeyModifiers.Windows)),
+            new HotkeyChord(
+                HotkeyModifiers.Control | HotkeyModifiers.Windows,
+                HotkeyKey.Space)),
         new(
             HotkeyAction.SmartEdit,
             new HotkeyChord(

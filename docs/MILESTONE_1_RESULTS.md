@@ -41,7 +41,7 @@ rules, valid hotkeys, and enabled-binding collisions.
 
 Hotkeys support:
 
-- modifier-only chords such as the default `Ctrl+Win`;
+- modifier-only chords such as `Ctrl+Win`;
 - logical normalization of left/right physical modifiers;
 - keyboard and mouse primary keys;
 - stable chord display; and

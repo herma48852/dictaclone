@@ -13,4 +13,6 @@ public interface IStatusOverlay
     void ShowStatus(OverlayStatus status, string? message = null);
 
     void HideStatus();
+
+    void UpdateLevel(double level);
 }

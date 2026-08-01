@@ -18,6 +18,11 @@ public interface IAudioCaptureSession : IAsyncDisposable
     Task CancelAsync(CancellationToken cancellationToken);
 }
 
+public interface IAudioLevelSource
+{
+    event EventHandler<AudioLevelChangedEvent>? LevelChanged;
+}
+
 public interface ITranscriptionEngine
 {
     Task<string> TranscribeAsync(
@@ -87,3 +92,5 @@ public enum HotkeyEventKind
     Pressed,
     Released,
 }
+
+public sealed record AudioLevelChangedEvent(double RootMeanSquare, double Peak);

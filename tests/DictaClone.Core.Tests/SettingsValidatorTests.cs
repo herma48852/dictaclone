@@ -193,4 +193,22 @@ public sealed class SettingsValidatorTests
             SettingsValidator.Validate(settings),
             error => error.Path == "Audio.SilenceThreshold");
     }
+
+    [Fact]
+    public void TranscriptionPrompt_HasABoundedLength()
+    {
+        DictaCloneSettings settings = DictaCloneSettings.Default with
+        {
+            Transcription = DictaCloneSettings.Default.Transcription with
+            {
+                InitialPrompt = new string('x', 2049),
+            },
+        };
+
+        Assert.Contains(
+            SettingsValidator.Validate(settings),
+            error =>
+                error.Path == "Transcription.InitialPrompt" &&
+                error.Code == "length");
+    }
 }

@@ -14,6 +14,8 @@ public sealed class ShortcutInterpreterTests
         RawInputControl.ForModifier(PhysicalModifier.LeftWindows);
     private static readonly RawInputControl RightWindows =
         RawInputControl.ForModifier(PhysicalModifier.RightWindows);
+    private static readonly RawInputControl Space =
+        RawInputControl.ForPrimaryKey(HotkeyKey.Space);
 
     [Fact]
     public void ThousandHoldCycles_EmitExactlyOneStartAndStopPerCycle()
@@ -26,7 +28,9 @@ public sealed class ShortcutInterpreterTests
         {
             events.AddRange(interpreter.Process(new(LeftControl, IsPressed: true)));
             events.AddRange(interpreter.Process(new(LeftWindows, IsPressed: true)));
-            events.AddRange(interpreter.Process(new(LeftWindows, IsPressed: true)));
+            events.AddRange(interpreter.Process(new(Space, IsPressed: true)));
+            events.AddRange(interpreter.Process(new(Space, IsPressed: true)));
+            events.AddRange(interpreter.Process(new(Space, IsPressed: false)));
             events.AddRange(interpreter.Process(new(LeftWindows, IsPressed: false)));
             events.AddRange(interpreter.Process(new(LeftControl, IsPressed: false)));
         }
@@ -55,13 +59,27 @@ public sealed class ShortcutInterpreterTests
             [HotkeyDefaults.Bindings[0]]);
 
         Assert.Empty(interpreter.Process(new(RightControl, IsPressed: true)));
-        HotkeyEvent pressed = Assert.Single(
-            interpreter.Process(new(RightWindows, IsPressed: true)));
+        Assert.Empty(interpreter.Process(new(RightWindows, IsPressed: true)));
+        HotkeyEvent pressed = Assert.Single(interpreter.Process(new(
+            Space,
+            IsPressed: true)));
         HotkeyEvent released = Assert.Single(
             interpreter.Process(new(RightControl, IsPressed: false)));
 
         Assert.Equal(HotkeyEventKind.Pressed, pressed.Kind);
         Assert.Equal(HotkeyEventKind.Released, released.Kind);
+    }
+
+    [Fact]
+    public void VirtualDesktopModifierPrefix_DoesNotStartDictation()
+    {
+        var interpreter = new ShortcutInterpreter(
+            [HotkeyDefaults.Bindings[0]]);
+
+        Assert.Empty(interpreter.Process(new(LeftControl, IsPressed: true)));
+        Assert.Empty(interpreter.Process(new(LeftWindows, IsPressed: true)));
+        Assert.Empty(interpreter.Process(new(LeftWindows, IsPressed: false)));
+        Assert.Empty(interpreter.Process(new(LeftControl, IsPressed: false)));
     }
 
     [Fact]
@@ -134,6 +152,7 @@ public sealed class ShortcutInterpreterTests
 
         _ = interpreter.Process(new(LeftControl, IsPressed: true));
         _ = interpreter.Process(new(LeftWindows, IsPressed: true));
+        _ = interpreter.Process(new(Space, IsPressed: true));
         _ = interpreter.Process(new(
             RawInputControl.ForPrimaryKey(HotkeyKey.F13),
             IsPressed: true));
@@ -156,7 +175,8 @@ public sealed class ShortcutInterpreterTests
             [HotkeyDefaults.Bindings[0] with { Enabled = false }]);
 
         _ = interpreter.Process(new(LeftControl, IsPressed: true));
-        Assert.Empty(interpreter.Process(new(LeftWindows, IsPressed: true)));
+        _ = interpreter.Process(new(LeftWindows, IsPressed: true));
+        Assert.Empty(interpreter.Process(new(Space, IsPressed: true)));
     }
 
     [Fact]

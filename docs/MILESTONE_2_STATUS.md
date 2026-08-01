@@ -1,8 +1,8 @@
 # Milestone 2 Status
 
 Milestone 2 is **complete and accepted**. Implementation, automated quality
-gates, and the manual foreground-application matrix all passed. Milestone 3 has
-not started.
+gates, and the manual foreground-application matrix all passed. Milestone 3
+began after this acceptance checkpoint.
 
 ## Delivered
 

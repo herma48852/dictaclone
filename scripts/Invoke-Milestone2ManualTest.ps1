@@ -100,8 +100,9 @@ switch ($Target) {
 Write-Output @'
 Manual check:
 1. Focus the target application.
-2. Hold Ctrl+Win. The red Listening pill should appear without moving focus.
+2. Hold Ctrl+Win+Space. The red Listening pill should appear without moving focus.
 3. Release the keys. The pill should show Working, then Shortcut detected.
 4. Double-click the DictaClone notification-area icon to test shortcut recording.
 5. Exit from the notification-area menu and confirm the shortcut no longer reacts.
+Closing the target window does not stop DictaClone; use Exit in the tray menu.
 '@

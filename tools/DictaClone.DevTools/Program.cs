@@ -1,5 +1,9 @@
+using System.Buffers.Binary;
 using System.Text.Json;
 using DictaClone.Audio;
+using DictaClone.Core.Contracts;
+using DictaClone.Core.Dictation;
+using DictaClone.Core.Settings;
 using DictaClone.Speech;
 using NAudio.Wave;
 
@@ -20,7 +24,11 @@ internal static class Program
             {
                 "devices" => ListDevices(),
                 "capture" => await CaptureAsync(args).ConfigureAwait(false),
+                "capture-pcm" => await CapturePcmAsync(args).ConfigureAwait(false),
                 "benchmark" => await BenchmarkAsync(args).ConfigureAwait(false),
+                "transcribe" => await TranscribeAsync(args).ConfigureAwait(false),
+                "speech-regression" => await SpeechRegressionAsync(args)
+                    .ConfigureAwait(false),
                 _ => ShowUsage(),
             };
         }
@@ -133,8 +141,183 @@ internal static class Program
 
               devices
               capture [seconds]
+              capture-pcm [seconds] [device-id]
               benchmark <wave> <expected.txt> <output.json> <model-name> <model-path> [<model-name> <model-path>...]
+              transcribe <wave> <model-name> [model-directory]
+              speech-regression <wave> <expected.txt> <model-name> <max-wer> [model-directory]
             """);
         return 64;
+    }
+
+    private static async Task<int> CapturePcmAsync(string[] args)
+    {
+        if (args.Length > 3)
+        {
+            return ShowUsage();
+        }
+
+        double seconds = args.Length >= 2
+            ? double.Parse(
+                args[1],
+                System.Globalization.CultureInfo.InvariantCulture)
+            : 1;
+        if (seconds is <= 0 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(args),
+                "Capture duration must be greater than zero and no more than ten seconds.");
+        }
+
+        string? deviceId = args.Length == 3 ? args[2] : null;
+        var service = new WasapiAudioCaptureService();
+        IAudioCaptureSession session = await service.StartAsync(
+                new(
+                    deviceId,
+                    SilenceThreshold: 0.012,
+                    MaximumDuration: TimeSpan.FromSeconds(10)),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        double maximumLevel = 0;
+        if (session is IAudioLevelSource levelSource)
+        {
+            levelSource.LevelChanged += (_, level) =>
+                maximumLevel = Math.Max(maximumLevel, level.Peak);
+        }
+
+        await using (session.ConfigureAwait(false))
+        {
+            await Task.Delay(TimeSpan.FromSeconds(seconds)).ConfigureAwait(false);
+            CapturedAudio audio = await session
+                .StopAsync(CancellationToken.None)
+                .ConfigureAwait(false);
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                audio.SampleRate,
+                audio.ChannelCount,
+                audio.Duration,
+                PcmBytes = audio.Pcm16.Length,
+                audio.IsSilent,
+                MaximumLevel = maximumLevel,
+            }, JsonOptions));
+            return audio.Pcm16.IsEmpty ? 4 : 0;
+        }
+    }
+
+    private static async Task<int> TranscribeAsync(string[] args)
+    {
+        if (args.Length is < 3 or > 4)
+        {
+            return ShowUsage();
+        }
+
+        string modelDirectory = args.Length == 4
+            ? args[3]
+            : WhisperModelStorage.ResolveDefaultDirectory();
+        CapturedAudio audio = await AudioFileLoader
+            .LoadAsync(args[1])
+            .ConfigureAwait(false);
+        using var manager = new WhisperModelManager(modelDirectory);
+        await using var engine = new WhisperTranscriptionEngine(manager);
+        string transcript = await engine.TranscribeAsync(
+                audio,
+                new(args[2], "en", WorkerThreads: 0),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+        Console.WriteLine(transcript);
+        return string.IsNullOrWhiteSpace(transcript) ? 3 : 0;
+    }
+
+    private static async Task<int> SpeechRegressionAsync(string[] args)
+    {
+        if (args.Length is < 5 or > 6 ||
+            !double.TryParse(
+                args[4],
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double maximumWordErrorRate) ||
+            maximumWordErrorRate is < 0 or > 1)
+        {
+            return ShowUsage();
+        }
+
+        string expected = await File
+            .ReadAllTextAsync(args[2])
+            .ConfigureAwait(false);
+        string modelDirectory = args.Length == 6
+            ? args[5]
+            : WhisperModelStorage.ResolveDefaultDirectory();
+        CapturedAudio original = await AudioFileLoader
+            .LoadAsync(args[1])
+            .ConfigureAwait(false);
+        using var manager = new WhisperModelManager(modelDirectory);
+        await using var engine = new WhisperTranscriptionEngine(manager);
+        var settings = new TranscriptionSettings(
+            args[3],
+            "en",
+            WorkerThreads: 0);
+        var cases = new Dictionary<string, CapturedAudio>(
+            StringComparer.Ordinal)
+        {
+            ["original"] = original,
+            ["padded-silence"] = AddSilence(original),
+            ["clipped"] = AmplifyAndClip(original),
+        };
+
+        bool passed = true;
+        foreach ((string name, CapturedAudio audio) in cases)
+        {
+            string transcript = await engine
+                .TranscribeAsync(audio, settings, CancellationToken.None)
+                .ConfigureAwait(false);
+            TranscriptScore score = TranscriptScorer.Score(expected, transcript);
+            Console.WriteLine(
+                $"{name}: WER={score.WordErrorRate:P1}; {transcript}");
+            passed &= score.WordErrorRate <= maximumWordErrorRate;
+        }
+
+        var silence = new CapturedAudio(
+            new byte[16_000 * sizeof(short)],
+            16_000,
+            1,
+            TimeSpan.FromSeconds(1),
+            IsSilent: true);
+        string silenceTranscript = await engine
+            .TranscribeAsync(silence, settings, CancellationToken.None)
+            .ConfigureAwait(false);
+        Console.WriteLine(
+            $"silence: {(silenceTranscript.Length == 0 ? "PASS" : "FAIL")}");
+        passed &= silenceTranscript.Length == 0;
+        return passed ? 0 : 5;
+    }
+
+    private static CapturedAudio AddSilence(CapturedAudio audio)
+    {
+        int paddingBytes = 16_000 * sizeof(short) / 2;
+        var padded = new byte[checked(audio.Pcm16.Length + (paddingBytes * 2))];
+        audio.Pcm16.CopyTo(padded.AsMemory(paddingBytes));
+        return audio with
+        {
+            Pcm16 = padded,
+            Duration = audio.Duration + TimeSpan.FromSeconds(1),
+        };
+    }
+
+    private static CapturedAudio AmplifyAndClip(CapturedAudio audio)
+    {
+        byte[] clipped = audio.Pcm16.ToArray();
+        for (int offset = 0; offset < clipped.Length; offset += sizeof(short))
+        {
+            int sample = BinaryPrimitives.ReadInt16LittleEndian(
+                clipped.AsSpan(offset, sizeof(short)));
+            short amplified = (short)Math.Clamp(
+                sample * 3,
+                short.MinValue,
+                short.MaxValue);
+            BinaryPrimitives.WriteInt16LittleEndian(
+                clipped.AsSpan(offset, sizeof(short)),
+                amplified);
+        }
+
+        return audio with { Pcm16 = clipped };
     }
 }

@@ -33,7 +33,8 @@ public sealed record AudioSettings(
 public sealed record TranscriptionSettings(
     string Model,
     string Language,
-    int WorkerThreads);
+    int WorkerThreads,
+    string? InitialPrompt = null);
 
 public sealed record TextProcessingSettings(
     ImmutableArray<VocabularyEntry> Vocabulary,

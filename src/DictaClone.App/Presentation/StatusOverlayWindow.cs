@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaBrushes = System.Windows.Media.Brushes;
 using MediaColor = System.Windows.Media.Color;
+using WpfProgressBar = System.Windows.Controls.ProgressBar;
 
 namespace DictaClone.App.Presentation;
 
@@ -26,6 +27,7 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
 
     private readonly Border _pill;
     private readonly TextBlock _label;
+    private readonly WpfProgressBar _levelMeter;
     private readonly DispatcherTimer _hideTimer;
 
     public StatusOverlayWindow()
@@ -46,14 +48,28 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
             FontWeight = FontWeights.SemiBold,
             Foreground = MediaBrushes.White,
             Margin = new(18, 9, 18, 10),
+            MaxWidth = 560,
+            TextWrapping = TextWrapping.Wrap,
         };
+        _levelMeter = new()
+        {
+            Height = 4,
+            Margin = new(18, 0, 18, 9),
+            Minimum = 0,
+            Maximum = 1,
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed,
+        };
+        var pillContent = new StackPanel();
+        pillContent.Children.Add(_label);
+        pillContent.Children.Add(_levelMeter);
         _pill = new()
         {
             Background = CreateBrush(0xCC, 0x16, 0x18, 0x1D),
             BorderBrush = CreateBrush(0x80, 0xFF, 0xFF, 0xFF),
             BorderThickness = new(1),
             CornerRadius = new(22),
-            Child = _label,
+            Child = pillContent,
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
                 BlurRadius = 18,
@@ -75,6 +91,13 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
         Dispatcher.VerifyAccess();
         _hideTimer.Stop();
         (_pill.Background, _label.Text) = GetAppearance(status, message);
+        _levelMeter.Visibility = status == OverlayStatus.Recording
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (status == OverlayStatus.Recording)
+        {
+            _levelMeter.Value = 0;
+        }
 
         if (!IsVisible)
         {
@@ -99,6 +122,15 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
         Dispatcher.VerifyAccess();
         _hideTimer.Stop();
         Hide();
+    }
+
+    public void UpdateLevel(double level)
+    {
+        Dispatcher.VerifyAccess();
+        if (_levelMeter.Visibility == Visibility.Visible)
+        {
+            _levelMeter.Value = Math.Clamp(level, 0, 1);
+        }
     }
 
     public bool HasNoActivateExtendedStyle

@@ -1,19 +1,26 @@
+using System.Collections;
 using System.Collections.Immutable;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using DictaClone.Audio;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Settings;
+using DictaClone.Speech;
 using DictaClone.Windows.Input;
 using WpfButton = System.Windows.Controls.Button;
 using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfOrientation = System.Windows.Controls.Orientation;
+using WpfSlider = System.Windows.Controls.Slider;
 
 namespace DictaClone.App.Presentation;
 
 public sealed class SettingsWindow : Window
 {
+    private static readonly string[] SupportedLanguages = ["en", "auto"];
+
     private readonly List<HotkeyBinding> _bindings;
     private readonly WpfListBox _bindingList;
     private readonly WpfComboBox _action;
@@ -21,25 +28,39 @@ public sealed class SettingsWindow : Window
     private readonly TextBlock _recordedChord;
     private readonly TextBlock _validation;
     private readonly WpfButton _recordButton;
+    private readonly WpfComboBox _audioDevice;
+    private readonly WpfComboBox _model;
+    private readonly WpfComboBox _language;
+    private readonly WpfSlider _silenceThreshold;
+    private readonly TextBlock _silenceThresholdLabel;
     private ShortcutRecordingSession? _recording;
     private HotkeyChord? _candidateChord;
 
-    public SettingsWindow(IEnumerable<HotkeyBinding> bindings)
+    public SettingsWindow(
+        IEnumerable<HotkeyBinding> bindings,
+        AudioSettings? audioSettings = null,
+        TranscriptionSettings? transcriptionSettings = null,
+        IReadOnlyList<MicrophoneDeviceInfo>? audioDevices = null)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         _bindings = [.. bindings];
+        Audio = audioSettings ?? DictaCloneSettings.Default.Audio;
+        Transcription =
+            transcriptionSettings ?? DictaCloneSettings.Default.Transcription;
+        audioDevices ??= [];
 
         Title = "DictaClone settings";
         Width = 680;
-        Height = 520;
+        Height = 650;
         MinWidth = 600;
-        MinHeight = 460;
+        MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         var root = new Grid
         {
             Margin = new(24),
         };
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -59,11 +80,106 @@ public sealed class SettingsWindow : Window
         });
         root.Children.Add(heading);
 
+        var audioPanel = new Grid
+        {
+            Margin = new(0, 0, 0, 18),
+        };
+        for (int column = 0; column < 3; column++)
+        {
+            audioPanel.ColumnDefinitions.Add(new()
+            {
+                Width = new(1, GridUnitType.Star),
+            });
+        }
+
+        AudioDeviceOption[] deviceOptions =
+        [
+            new(null, "System default (follow changes)"),
+            .. audioDevices.Select(device => new AudioDeviceOption(
+                device.Id,
+                device.IsDefault
+                    ? $"{device.FriendlyName} (current default)"
+                    : device.FriendlyName)),
+        ];
+        _audioDevice = CreateComboBox(deviceOptions);
+        _audioDevice.SelectedItem = deviceOptions.FirstOrDefault(option =>
+            string.Equals(
+                option.Id,
+                Audio.DeviceId,
+                StringComparison.Ordinal));
+        _audioDevice.SelectedIndex = Math.Max(_audioDevice.SelectedIndex, 0);
+
+        _model = CreateComboBox(
+            WhisperModelCatalog.AvailableModels
+                .OrderBy(model => model.Length)
+                .Select(model => model.Name)
+                .ToArray());
+        _model.SelectedItem = Transcription.Model;
+        _model.SelectedIndex = Math.Max(_model.SelectedIndex, 0);
+
+        _language = CreateComboBox(SupportedLanguages);
+        _language.SelectedItem = Transcription.Language;
+        _language.SelectedIndex = Math.Max(_language.SelectedIndex, 0);
+
+        AddLabeledControl(audioPanel, "Microphone", _audioDevice, column: 0);
+        AddLabeledControl(audioPanel, "Local model", _model, column: 1);
+        AddLabeledControl(audioPanel, "Language", _language, column: 2);
+
+        var sensitivityPanel = new Grid
+        {
+            Margin = new(0, 10, 0, 0),
+        };
+        sensitivityPanel.ColumnDefinitions.Add(new()
+        {
+            Width = new(1, GridUnitType.Star),
+        });
+        sensitivityPanel.ColumnDefinitions.Add(new()
+        {
+            Width = GridLength.Auto,
+        });
+        sensitivityPanel.ColumnDefinitions.Add(new()
+        {
+            Width = GridLength.Auto,
+        });
+        _silenceThreshold = new()
+        {
+            Minimum = 0,
+            Maximum = 0.1,
+            Value = Audio.SilenceThreshold,
+            TickFrequency = 0.005,
+            IsSnapToTickEnabled = true,
+            Margin = new(0, 0, 12, 0),
+        };
+        _silenceThresholdLabel = new()
+        {
+            Text = FormatThreshold(_silenceThreshold.Value),
+            Width = 54,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var applyAudioButton = new WpfButton
+        {
+            Content = "Apply audio",
+            MinWidth = 110,
+            Padding = new(10, 6, 10, 6),
+        };
+        sensitivityPanel.Children.Add(_silenceThreshold);
+        Grid.SetColumn(_silenceThresholdLabel, 1);
+        sensitivityPanel.Children.Add(_silenceThresholdLabel);
+        Grid.SetColumn(applyAudioButton, 2);
+        sensitivityPanel.Children.Add(applyAudioButton);
+        Grid.SetRow(sensitivityPanel, 1);
+        Grid.SetColumnSpan(sensitivityPanel, 3);
+        audioPanel.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        audioPanel.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        audioPanel.Children.Add(sensitivityPanel);
+        Grid.SetRow(audioPanel, 1);
+        root.Children.Add(audioPanel);
+
         _bindingList = new()
         {
             Margin = new(0, 0, 0, 18),
         };
-        Grid.SetRow(_bindingList, 1);
+        Grid.SetRow(_bindingList, 2);
         root.Children.Add(_bindingList);
 
         var editor = new Grid();
@@ -127,7 +243,7 @@ public sealed class SettingsWindow : Window
         Grid.SetColumnSpan(_validation, 3);
         editor.Children.Add(_validation);
 
-        Grid.SetRow(editor, 2);
+        Grid.SetRow(editor, 3);
         root.Children.Add(editor);
         Content = root;
 
@@ -135,6 +251,10 @@ public sealed class SettingsWindow : Window
         _recordButton.Click += (_, _) => BeginRecording();
         applyButton.Click += (_, _) => ApplyBinding();
         resetButton.Click += (_, _) => ResetDefaults();
+        _silenceThreshold.ValueChanged += (_, _) =>
+            _silenceThresholdLabel.Text =
+                FormatThreshold(_silenceThreshold.Value);
+        applyAudioButton.Click += (_, _) => ApplyAudioSettings();
 
         RefreshBindings();
         _action.SelectedItem = HotkeyAction.Dictation;
@@ -143,7 +263,14 @@ public sealed class SettingsWindow : Window
 
     public event EventHandler<HotkeyBindingsChanged>? BindingsChanged;
 
+    public event EventHandler<AudioSpeechSettingsChangedEventArgs>?
+        AudioSpeechSettingsChanged;
+
     public ImmutableArray<HotkeyBinding> Bindings => [.. _bindings];
+
+    public AudioSettings Audio { get; private set; }
+
+    public TranscriptionSettings Transcription { get; private set; }
 
     protected override void OnPreviewKeyDown(WpfKeyEventArgs e)
     {
@@ -187,7 +314,7 @@ public sealed class SettingsWindow : Window
         base.OnPreviewMouseDown(e);
     }
 
-    private static WpfComboBox CreateComboBox(Array values) =>
+    private static WpfComboBox CreateComboBox(IEnumerable values) =>
         new()
         {
             ItemsSource = values,
@@ -309,6 +436,33 @@ public sealed class SettingsWindow : Window
         BindingsChanged?.Invoke(this, new([.. _bindings]));
     }
 
+    private void ApplyAudioSettings()
+    {
+        if (_audioDevice.SelectedItem is not AudioDeviceOption device ||
+            _model.SelectedItem is not string model ||
+            _language.SelectedItem is not string language)
+        {
+            _validation.Text = "Choose a microphone, model, and language.";
+            return;
+        }
+
+        Audio = Audio with
+        {
+            DeviceId = device.Id,
+            SilenceThreshold = _silenceThreshold.Value,
+        };
+        Transcription = Transcription with
+        {
+            Model = model,
+            Language = language,
+        };
+        _validation.Text =
+            "Audio and local transcription settings applied for this run.";
+        AudioSpeechSettingsChanged?.Invoke(
+            this,
+            new(Audio, Transcription));
+    }
+
     private void RefreshBindings()
     {
         _bindingList.ItemsSource = _bindings
@@ -318,7 +472,24 @@ public sealed class SettingsWindow : Window
                 $"{binding.Activation}")
             .ToArray();
     }
+
+    private static string FormatThreshold(double value) =>
+        value.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture);
+
+    private sealed record AudioDeviceOption(string? Id, string DisplayName)
+    {
+        public override string ToString() => DisplayName;
+    }
 }
 
 public sealed record HotkeyBindingsChanged(
     ImmutableArray<HotkeyBinding> Bindings);
+
+public sealed class AudioSpeechSettingsChangedEventArgs(
+    AudioSettings audio,
+    TranscriptionSettings transcription) : EventArgs
+{
+    public AudioSettings Audio { get; } = audio;
+
+    public TranscriptionSettings Transcription { get; } = transcription;
+}
