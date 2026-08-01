@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DictaClone.Audio.Tests/DictaClone.Audio.Tests.csproj" />
+    <Project Path="tests/DictaClone.App.Tests/DictaClone.App.Tests.csproj" />
     <Project Path="tests/DictaClone.Core.Tests/DictaClone.Core.Tests.csproj" />
     <Project Path="tests/DictaClone.EndToEndTests/DictaClone.EndToEndTests.csproj" />
     <Project Path="tests/DictaClone.IntegrationTests/DictaClone.IntegrationTests.csproj" />

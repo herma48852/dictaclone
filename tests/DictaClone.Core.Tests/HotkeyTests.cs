@@ -57,6 +57,11 @@ public sealed class HotkeyTests
 
         var unknown = new HotkeyChord((HotkeyModifiers)128);
         Assert.False(unknown.IsValid);
+
+        var unknownKey = new HotkeyChord(
+            HotkeyModifiers.None,
+            (HotkeyKey)999);
+        Assert.False(unknownKey.IsValid);
     }
 
     [Fact]
@@ -86,6 +91,9 @@ public sealed class HotkeyTests
     {
         Assert.Equal(4, HotkeyDefaults.Bindings.Length);
         Assert.All(HotkeyDefaults.Bindings, binding => Assert.True(binding.Chord.IsValid));
+        Assert.All(
+            HotkeyDefaults.Bindings,
+            binding => Assert.Equal(HotkeyActivation.Hold, binding.Activation));
         Assert.Empty(HotkeyConflictDetector.Find(HotkeyDefaults.Bindings));
     }
 

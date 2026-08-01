@@ -171,14 +171,32 @@ public static class SettingsValidator
             return;
         }
 
+        var assignedActions = new HashSet<HotkeyAction>();
         for (int index = 0; index < bindings.Length; index++)
         {
+            HotkeyBinding binding = bindings[index];
             if (!bindings[index].Chord.IsValid)
             {
                 errors.Add(new(
                     $"Hotkeys[{index}].Chord",
                     "invalid",
                     "A chord must contain a modifier or primary key."));
+            }
+
+            if (!Enum.IsDefined(binding.Action) ||
+                !Enum.IsDefined(binding.Activation))
+            {
+                errors.Add(new(
+                    $"Hotkeys[{index}]",
+                    "invalid",
+                    "Hotkey action and activation must be recognized values."));
+            }
+            else if (!assignedActions.Add(binding.Action))
+            {
+                errors.Add(new(
+                    $"Hotkeys[{index}].Action",
+                    "duplicate",
+                    "Each action can have only one binding."));
             }
         }
 

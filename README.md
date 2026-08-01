@@ -1,8 +1,8 @@
 # DictaClone
 
-DictaClone is a planned local-first voice-to-text application for Windows 11 x64.
-Its core workflow is simple: hold a global shortcut, speak, release it, and insert
-the transcription wherever the text cursor is active.
+DictaClone is a local-first voice-to-text application under development for
+Windows 11 x64. Its target workflow is simple: hold a global shortcut, speak,
+release it, and insert the transcription wherever the text cursor is active.
 
 The project will provide local Whisper transcription, a Windows tray interface,
 configurable shortcuts, clipboard and character-by-character insertion modes,
@@ -11,11 +11,16 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Planning, Milestone 0, and Milestone 1 are complete. The repository contains the
-pinned toolchain, solution/test scaffolding, a working WASAPI microphone probe,
-measured local Whisper benchmarks, and the platform-neutral dictation workflow,
-settings, hotkey, and deterministic text-processing core. Milestone 2 (tray UI,
-status overlay, and global hooks) remains paused for review.
+Planning, Milestone 0, and Milestone 1 are complete. Milestone 2 is an
+automated-pass review candidate: the tray application, non-activating status
+overlay, global keyboard/mouse hooks, shortcut recorder, conflict validation,
+and lifecycle safeguards are implemented. Its 137-test clean regression suite
+passes with 95.95% Core line coverage. Manual trigger/focus checks in Notepad,
+Edge, VS Code, and the test target remain before Milestone 2 is accepted.
+
+Live microphone capture and transcription are not connected to the tray app
+yet; that is Milestone 3. The current app previews the trigger and overlay
+lifecycle.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the proposed
 architecture, milestones, unit and regression tests, privacy constraints, and
@@ -26,6 +31,10 @@ measurements and model decision.
 
 See the [Milestone 1 results](docs/MILESTONE_1_RESULTS.md) for the workflow,
 settings, text pipeline, test, and coverage results.
+
+See the [Milestone 2 status](docs/MILESTONE_2_STATUS.md) for the implemented UI
+and hook scope, automated evidence, smoke-test diagnosis, and manual review
+checklist.
 
 ## Initial target
 
@@ -57,6 +66,13 @@ Optional Milestone 0 hardware checks:
 .\scripts\Invoke-AudioProbe.ps1
 .\scripts\Download-Models.ps1
 .\scripts\Invoke-Milestone0Benchmark.ps1
+```
+
+Run the Milestone 2 process smoke test and launch its manual review harness with:
+
+```powershell
+.\scripts\Invoke-Milestone2SmokeTest.ps1 -NoBuild
+.\scripts\Invoke-Milestone2ManualTest.ps1 -Target TestTarget -NoBuild
 ```
 
 Speech models, the local SDK, NuGet caches, and generated benchmark output are

@@ -67,6 +67,18 @@ public enum HotkeyKey
     F10,
     F11,
     F12,
+    F13,
+    F14,
+    F15,
+    F16,
+    F17,
+    F18,
+    F19,
+    F20,
+    F21,
+    F22,
+    F23,
+    F24,
     MouseMiddle,
     MouseButton4,
     MouseButton5,
@@ -78,6 +90,12 @@ public enum HotkeyAction
     SmartEdit,
     TypingMode,
     Cancel,
+}
+
+public enum HotkeyActivation
+{
+    Hold,
+    Toggle,
 }
 
 public readonly record struct HotkeyChord(
@@ -92,7 +110,8 @@ public readonly record struct HotkeyChord(
 
     public bool IsValid =>
         (Modifiers & ~AllModifiers) == HotkeyModifiers.None &&
-        (Modifiers != HotkeyModifiers.None || PrimaryKey.HasValue);
+        (Modifiers != HotkeyModifiers.None || PrimaryKey.HasValue) &&
+        (!PrimaryKey.HasValue || Enum.IsDefined(PrimaryKey.Value));
 
     public static HotkeyChord FromPhysicalModifiers(
         IEnumerable<PhysicalModifier> modifiers,
@@ -154,7 +173,8 @@ public readonly record struct HotkeyChord(
 public sealed record HotkeyBinding(
     HotkeyAction Action,
     HotkeyChord Chord,
-    bool Enabled = true);
+    bool Enabled = true,
+    HotkeyActivation Activation = HotkeyActivation.Hold);
 
 public sealed record HotkeyConflict(
     HotkeyAction First,

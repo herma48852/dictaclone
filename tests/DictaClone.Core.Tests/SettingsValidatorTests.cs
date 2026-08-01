@@ -121,6 +121,40 @@ public sealed class SettingsValidatorTests
     }
 
     [Fact]
+    public void Hotkeys_RejectDuplicateActionsAndUnknownEnums()
+    {
+        DictaCloneSettings settings = DictaCloneSettings.Default with
+        {
+            Hotkeys =
+            [
+                new(
+                    HotkeyAction.Dictation,
+                    new HotkeyChord(HotkeyModifiers.Control)),
+                new(
+                    HotkeyAction.Dictation,
+                    new HotkeyChord(HotkeyModifiers.Alt)),
+                new(
+                    (HotkeyAction)999,
+                    new HotkeyChord(HotkeyModifiers.Shift),
+                    Activation: (HotkeyActivation)999),
+            ],
+        };
+
+        var errors = SettingsValidator.Validate(settings);
+
+        Assert.Contains(
+            errors,
+            error =>
+                error.Path == "Hotkeys[1].Action" &&
+                error.Code == "duplicate");
+        Assert.Contains(
+            errors,
+            error =>
+                error.Path == "Hotkeys[2]" &&
+                error.Code == "invalid");
+    }
+
+    [Fact]
     public void TextCollections_MustBeInitialized()
     {
         DictaCloneSettings settings = DictaCloneSettings.Default with
