@@ -69,6 +69,9 @@ public sealed class WindowConfigurationTests
                     Model = "small.en",
                     Language = "auto",
                 };
+            var insertion = new InsertionSettings(
+                TextInsertionMode.DelayedTyping,
+                TimeSpan.FromMilliseconds(35));
             var devices = new[]
             {
                 new MicrophoneDeviceInfo(
@@ -80,10 +83,12 @@ public sealed class WindowConfigurationTests
                 HotkeyDefaults.Bindings,
                 audio,
                 transcription,
-                devices);
+                devices,
+                insertion);
 
             Assert.Equal(audio, window.Audio);
             Assert.Equal(transcription, window.Transcription);
+            Assert.Equal(insertion, window.Insertion);
 
             window.Close();
         });

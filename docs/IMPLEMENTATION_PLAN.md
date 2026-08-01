@@ -1,8 +1,8 @@
 # DictaClone implementation plan
 
-Status: Milestones 0-2 complete; Milestone 3 is an automated-pass review candidate.
+Status: Milestones 0-4 complete and accepted; Milestone 5 is next.
 
-Last reviewed: 2026-07-31
+Last reviewed: 2026-08-01
 
 ## 1. Product goal
 
@@ -41,7 +41,8 @@ DictaClone will target functional parity in staged milestones:
 | Smart Edit and selected-text editing | Yes, through an explicitly configured provider | Bundled on-device generative model if performance is acceptable |
 | Local history/recovery | Opt-in, text only | Search and tagging |
 | Accounts, billing, word quotas, telemetry | No | Not planned |
-| macOS, mobile, Telegram, or browser extensions | No | Not planned |
+| macOS | No | Planned after the Windows release; see `docs/MACOS_PORTING_GUIDE.md` |
+| Mobile, Telegram, or browser extensions | No | Not planned |
 
 ## 3. Target machine and feasibility
 

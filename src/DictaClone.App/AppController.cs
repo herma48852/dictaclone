@@ -7,6 +7,7 @@ using DictaClone.Core.Hotkeys;
 using DictaClone.Core.Settings;
 using DictaClone.Speech;
 using DictaClone.Text;
+using DictaClone.Windows;
 using DictaClone.Windows.Input;
 using WpfApplication = System.Windows.Application;
 
@@ -44,6 +45,8 @@ public sealed class AppController : IAsyncDisposable
             new WasapiAudioCaptureService(),
             _transcription,
             new DeterministicTextProcessor(),
+            new ForegroundTargetService(),
+            new TextInsertionService(),
             _overlay,
             _settings,
             PostToUi);
@@ -178,7 +181,8 @@ public sealed class AppController : IAsyncDisposable
                 _bindings,
                 _settings.Audio,
                 _settings.Transcription,
-                devices);
+                devices,
+                _settings.Insertion);
             _settingsWindow.BindingsChanged += BindingsChanged;
             _settingsWindow.AudioSpeechSettingsChanged +=
                 AudioSpeechSettingsChanged;
@@ -278,6 +282,7 @@ public sealed class AppController : IAsyncDisposable
         {
             Audio = eventArgs.Audio,
             Transcription = eventArgs.Transcription,
+            Insertion = eventArgs.Insertion,
         };
 
         try
@@ -286,13 +291,13 @@ public sealed class AppController : IAsyncDisposable
             _settings = updated;
             _overlay.ShowStatus(
                 OverlayStatus.Success,
-                "✓  Audio settings updated");
+                "✓  Settings updated");
         }
         catch (Exception)
         {
             _overlay.ShowStatus(
                 OverlayStatus.Failure,
-                "Finish the active dictation before changing audio settings");
+                "Finish the active dictation before changing settings");
         }
     }
 

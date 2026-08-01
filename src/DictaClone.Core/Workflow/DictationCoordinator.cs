@@ -394,6 +394,4 @@ public sealed class DictationCoordinator : IAsyncDisposable
 
         public Task<DictationResult>? Completion { get; set; }
     }
-
-    private sealed class ForegroundTargetChangedException : InvalidOperationException;
 }

@@ -69,4 +69,5 @@ public sealed record CapturedAudio(
 public sealed record ForegroundTarget(
     string Id,
     string ProcessName,
-    string WindowClass);
+    string WindowClass,
+    bool IsElevated = false);

@@ -33,6 +33,9 @@ public sealed class SettingsWindow : Window
     private readonly WpfComboBox _language;
     private readonly WpfSlider _silenceThreshold;
     private readonly TextBlock _silenceThresholdLabel;
+    private readonly WpfComboBox _insertionMode;
+    private readonly WpfSlider _characterDelay;
+    private readonly TextBlock _characterDelayLabel;
     private ShortcutRecordingSession? _recording;
     private HotkeyChord? _candidateChord;
 
@@ -40,20 +43,22 @@ public sealed class SettingsWindow : Window
         IEnumerable<HotkeyBinding> bindings,
         AudioSettings? audioSettings = null,
         TranscriptionSettings? transcriptionSettings = null,
-        IReadOnlyList<MicrophoneDeviceInfo>? audioDevices = null)
+        IReadOnlyList<MicrophoneDeviceInfo>? audioDevices = null,
+        InsertionSettings? insertionSettings = null)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         _bindings = [.. bindings];
         Audio = audioSettings ?? DictaCloneSettings.Default.Audio;
         Transcription =
             transcriptionSettings ?? DictaCloneSettings.Default.Transcription;
+        Insertion = insertionSettings ?? DictaCloneSettings.Default.Insertion;
         audioDevices ??= [];
 
         Title = "DictaClone settings";
         Width = 680;
-        Height = 650;
+        Height = 720;
         MinWidth = 600;
-        MinHeight = 580;
+        MinHeight = 650;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         var root = new Grid
@@ -156,22 +161,85 @@ public sealed class SettingsWindow : Window
             Width = 54,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        var applyAudioButton = new WpfButton
-        {
-            Content = "Apply audio",
-            MinWidth = 110,
-            Padding = new(10, 6, 10, 6),
-        };
         sensitivityPanel.Children.Add(_silenceThreshold);
         Grid.SetColumn(_silenceThresholdLabel, 1);
         sensitivityPanel.Children.Add(_silenceThresholdLabel);
-        Grid.SetColumn(applyAudioButton, 2);
-        sensitivityPanel.Children.Add(applyAudioButton);
         Grid.SetRow(sensitivityPanel, 1);
         Grid.SetColumnSpan(sensitivityPanel, 3);
+
+        _insertionMode = CreateComboBox(Enum.GetValues<TextInsertionMode>());
+        _insertionMode.SelectedItem = Insertion.Mode;
+        _characterDelay = new()
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = Insertion.CharacterDelay.TotalMilliseconds,
+            TickFrequency = 5,
+            IsSnapToTickEnabled = true,
+            Margin = new(0, 4, 12, 0),
+        };
+        _characterDelayLabel = new()
+        {
+            Text = FormatDelay(_characterDelay.Value),
+            Width = 54,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var delayControl = new Grid();
+        delayControl.ColumnDefinitions.Add(new()
+        {
+            Width = new(1, GridUnitType.Star),
+        });
+        delayControl.ColumnDefinitions.Add(new()
+        {
+            Width = GridLength.Auto,
+        });
+        delayControl.Children.Add(_characterDelay);
+        Grid.SetColumn(_characterDelayLabel, 1);
+        delayControl.Children.Add(_characterDelayLabel);
+
+        var insertionPanel = new Grid
+        {
+            Margin = new(0, 12, 0, 0),
+        };
+        insertionPanel.ColumnDefinitions.Add(new()
+        {
+            Width = new(1, GridUnitType.Star),
+        });
+        insertionPanel.ColumnDefinitions.Add(new()
+        {
+            Width = new(2, GridUnitType.Star),
+        });
+        insertionPanel.ColumnDefinitions.Add(new()
+        {
+            Width = GridLength.Auto,
+        });
+        AddLabeledControl(
+            insertionPanel,
+            "Default insertion",
+            _insertionMode,
+            column: 0);
+        AddLabeledControl(
+            insertionPanel,
+            "Typing delay",
+            delayControl,
+            column: 1);
+        var applyAudioButton = new WpfButton
+        {
+            Content = "Apply settings",
+            MinWidth = 110,
+            Padding = new(10, 6, 10, 6),
+            VerticalAlignment = VerticalAlignment.Bottom,
+        };
+        Grid.SetColumn(applyAudioButton, 2);
+        insertionPanel.Children.Add(applyAudioButton);
+        Grid.SetRow(insertionPanel, 2);
+        Grid.SetColumnSpan(insertionPanel, 3);
+
+        audioPanel.RowDefinitions.Add(new() { Height = GridLength.Auto });
         audioPanel.RowDefinitions.Add(new() { Height = GridLength.Auto });
         audioPanel.RowDefinitions.Add(new() { Height = GridLength.Auto });
         audioPanel.Children.Add(sensitivityPanel);
+        audioPanel.Children.Add(insertionPanel);
         Grid.SetRow(audioPanel, 1);
         root.Children.Add(audioPanel);
 
@@ -254,6 +322,8 @@ public sealed class SettingsWindow : Window
         _silenceThreshold.ValueChanged += (_, _) =>
             _silenceThresholdLabel.Text =
                 FormatThreshold(_silenceThreshold.Value);
+        _characterDelay.ValueChanged += (_, _) =>
+            _characterDelayLabel.Text = FormatDelay(_characterDelay.Value);
         applyAudioButton.Click += (_, _) => ApplyAudioSettings();
 
         RefreshBindings();
@@ -271,6 +341,8 @@ public sealed class SettingsWindow : Window
     public AudioSettings Audio { get; private set; }
 
     public TranscriptionSettings Transcription { get; private set; }
+
+    public InsertionSettings Insertion { get; private set; }
 
     protected override void OnPreviewKeyDown(WpfKeyEventArgs e)
     {
@@ -440,9 +512,11 @@ public sealed class SettingsWindow : Window
     {
         if (_audioDevice.SelectedItem is not AudioDeviceOption device ||
             _model.SelectedItem is not string model ||
-            _language.SelectedItem is not string language)
+            _language.SelectedItem is not string language ||
+            _insertionMode.SelectedItem is not TextInsertionMode insertionMode)
         {
-            _validation.Text = "Choose a microphone, model, and language.";
+            _validation.Text =
+                "Choose a microphone, model, language, and insertion mode.";
             return;
         }
 
@@ -456,11 +530,14 @@ public sealed class SettingsWindow : Window
             Model = model,
             Language = language,
         };
+        Insertion = new(
+            insertionMode,
+            TimeSpan.FromMilliseconds(_characterDelay.Value));
         _validation.Text =
-            "Audio and local transcription settings applied for this run.";
+            "Audio, transcription, and insertion settings applied for this run.";
         AudioSpeechSettingsChanged?.Invoke(
             this,
-            new(Audio, Transcription));
+            new(Audio, Transcription, Insertion));
     }
 
     private void RefreshBindings()
@@ -476,6 +553,9 @@ public sealed class SettingsWindow : Window
     private static string FormatThreshold(double value) =>
         value.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture);
 
+    private static string FormatDelay(double value) =>
+        $"{value:0} ms";
+
     private sealed record AudioDeviceOption(string? Id, string DisplayName)
     {
         public override string ToString() => DisplayName;
@@ -487,9 +567,12 @@ public sealed record HotkeyBindingsChanged(
 
 public sealed class AudioSpeechSettingsChangedEventArgs(
     AudioSettings audio,
-    TranscriptionSettings transcription) : EventArgs
+    TranscriptionSettings transcription,
+    InsertionSettings insertion) : EventArgs
 {
     public AudioSettings Audio { get; } = audio;
 
     public TranscriptionSettings Transcription { get; } = transcription;
+
+    public InsertionSettings Insertion { get; } = insertion;
 }

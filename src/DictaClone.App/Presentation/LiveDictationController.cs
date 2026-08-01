@@ -14,11 +14,14 @@ public sealed class LiveDictationController : IAsyncDisposable
     private readonly IAudioCaptureService _audioCapture;
     private readonly ITranscriptionEngine _transcription;
     private readonly ITextProcessor _textProcessor;
+    private readonly IForegroundTargetService _foregroundTarget;
+    private readonly ITextInsertionService _textInsertion;
     private readonly IStatusOverlay _overlay;
     private readonly Action<Action> _postToUi;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DictaCloneSettings _settings;
     private IAudioCaptureSession? _captureSession;
+    private ForegroundTarget? _capturedTarget;
     private CancellationTokenSource? _operationCancellation;
     private TaskCompletionSource? _operationCompletion;
     private HotkeyAction? _activeAction;
@@ -29,6 +32,8 @@ public sealed class LiveDictationController : IAsyncDisposable
         IAudioCaptureService audioCapture,
         ITranscriptionEngine transcription,
         ITextProcessor textProcessor,
+        IForegroundTargetService foregroundTarget,
+        ITextInsertionService textInsertion,
         IStatusOverlay overlay,
         DictaCloneSettings settings,
         Action<Action>? postToUi = null)
@@ -39,6 +44,10 @@ public sealed class LiveDictationController : IAsyncDisposable
             throw new ArgumentNullException(nameof(transcription));
         _textProcessor = textProcessor ??
             throw new ArgumentNullException(nameof(textProcessor));
+        _foregroundTarget = foregroundTarget ??
+            throw new ArgumentNullException(nameof(foregroundTarget));
+        _textInsertion = textInsertion ??
+            throw new ArgumentNullException(nameof(textInsertion));
         _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _postToUi = postToUi ?? (action => action());
@@ -116,6 +125,7 @@ public sealed class LiveDictationController : IAsyncDisposable
             cancellation = _operationCancellation;
             completion = _operationCompletion?.Task;
             _captureSession = null;
+            _capturedTarget = null;
             _activeAction = null;
             cancellation?.Cancel();
         }
@@ -182,10 +192,14 @@ public sealed class LiveDictationController : IAsyncDisposable
             var cancellation = new CancellationTokenSource();
             try
             {
+                ForegroundTarget target = await _foregroundTarget
+                    .CaptureAsync(cancellation.Token)
+                    .ConfigureAwait(false);
                 IAudioCaptureSession session = await _audioCapture
                     .StartAsync(_settings.Audio, cancellation.Token)
                     .ConfigureAwait(false);
                 _captureSession = session;
+                _capturedTarget = target;
                 _operationCancellation = cancellation;
                 _operationCompletion = new(
                     TaskCreationOptions.RunContinuationsAsynchronously);
@@ -212,6 +226,7 @@ public sealed class LiveDictationController : IAsyncDisposable
     private async Task StopAndTranscribeAsync(HotkeyAction action)
     {
         IAudioCaptureSession? session;
+        ForegroundTarget? target;
         CancellationTokenSource? cancellation;
         DictaCloneSettings settings;
 
@@ -224,9 +239,11 @@ public sealed class LiveDictationController : IAsyncDisposable
             }
 
             session = _captureSession;
+            target = _capturedTarget;
             cancellation = _operationCancellation;
             settings = _settings;
             _captureSession = null;
+            _capturedTarget = null;
             _activeAction = null;
             _processing = true;
             UnsubscribeLevel(session);
@@ -284,6 +301,28 @@ public sealed class LiveDictationController : IAsyncDisposable
                     "No speech detected"));
                 return;
             }
+
+            bool targetIsCurrent = await _foregroundTarget
+                .IsCurrentAsync(target!, token)
+                .ConfigureAwait(false);
+            if (!targetIsCurrent)
+            {
+                throw new ForegroundTargetChangedException();
+            }
+
+            Post(() => _overlay.ShowStatus(
+                OverlayStatus.Processing,
+                "Inserting text…"));
+            InsertionSettings insertionSettings = action ==
+                HotkeyAction.TypingMode
+                    ? settings.Insertion with
+                    {
+                        Mode = TextInsertionMode.DelayedTyping,
+                    }
+                    : settings.Insertion;
+            await _textInsertion
+                .InsertAsync(finalText, target!, insertionSettings, token)
+                .ConfigureAwait(false);
 
             LastTranscript = finalText;
             Post(() =>
@@ -433,6 +472,16 @@ public sealed class LiveDictationController : IAsyncDisposable
         {
             ModelIntegrityException => "Speech model verification failed",
             HttpRequestException => "Speech model is unavailable offline",
+            ForegroundTargetUnavailableException =>
+                "No focused app is available for insertion",
+            ForegroundTargetChangedException =>
+                "Focus changed; text was not inserted",
+            ElevatedTargetException =>
+                "Windows blocks input to elevated apps",
+            ClipboardContentionException =>
+                "Clipboard is busy; text was not inserted",
+            InputInjectionException =>
+                "Windows blocked text insertion",
             _ => $"Dictation failed ({exception.GetType().Name})",
         };
 

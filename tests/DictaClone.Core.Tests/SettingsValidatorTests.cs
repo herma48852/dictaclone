@@ -42,7 +42,7 @@ public sealed class SettingsValidatorTests
             Transcription = new TranscriptionSettings("", " ", 65),
             Insertion = new InsertionSettings(
                 TextInsertionMode.DelayedTyping,
-                TimeSpan.FromMilliseconds(501)),
+                TimeSpan.FromMilliseconds(101)),
         };
 
         var errors = SettingsValidator.Validate(settings);

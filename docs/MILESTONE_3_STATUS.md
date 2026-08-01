@@ -1,14 +1,14 @@
 # Milestone 3 Status
 
-Milestone 3 is an **automated-pass review candidate**. Audio capture, local
+Milestone 3 is **accepted for progression**. Audio capture, local
 transcription, app composition, and automated exit gates are implemented. The
 live-microphone review exposed a WPF startup deadlock that prevented microphone
 completion from being dispatched. A dump of the hung process identified the
 exact blocking stack. The corrected lifecycle passes the full automated gate
 and the end-to-end hold/speak/release retest now displays recognized text.
 Settings, virtual-desktop isolation, clean tray exit, and disconnected-network
-operation remain in the manual acceptance matrix, so Milestone 4 has not
-started.
+operation remain documented as follow-up compatibility checks. The user
+accepted the core live workflow and authorized Milestone 4 to begin.
 
 ## Delivered
 
@@ -153,7 +153,7 @@ all 177 tests with no warnings. The user then repeated the live
 hold/speak/release workflow and saw the recognized text, confirming the fix
 end to end.
 
-## Remaining manual acceptance
+## Follow-up compatibility checks
 
 Start the review build with:
 
@@ -167,7 +167,7 @@ Accepted:
    status pill. **Passed in live user testing.** Cursor insertion is
    intentionally deferred to Milestone 4.
 
-Still to verify:
+Still useful to verify during release qualification:
 
 1. Confirm the level meter moves only while recording.
 2. Use `Ctrl+Win+Left/Right` to switch virtual desktops and confirm no red pill
@@ -179,5 +179,5 @@ Still to verify:
 5. Exit from the notification-area menu and confirm the tray process stops.
 
 Closing another test window does not stop DictaClone; the tray process must be
-exited from its own menu. After this manual matrix passes, Milestone 3 can be
-promoted to complete and Milestone 4 can begin.
+exited from its own menu. These checks remain visible rather than being
+recorded as passes without evidence.

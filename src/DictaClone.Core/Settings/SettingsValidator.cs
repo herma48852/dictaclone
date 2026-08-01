@@ -160,12 +160,12 @@ public static class SettingsValidator
         ImmutableArray<SettingsValidationError>.Builder errors)
     {
         if (settings.CharacterDelay < TimeSpan.Zero ||
-            settings.CharacterDelay > TimeSpan.FromMilliseconds(500))
+            settings.CharacterDelay > TimeSpan.FromMilliseconds(100))
         {
             errors.Add(new(
                 "Insertion.CharacterDelay",
                 "range",
-                "Character delay must be between 0 and 500 milliseconds."));
+                "Character delay must be between 0 and 100 milliseconds."));
         }
     }
 

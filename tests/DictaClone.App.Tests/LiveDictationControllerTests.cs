@@ -22,10 +22,14 @@ public sealed class LiveDictationControllerTests
     {
         var session = new FakeCaptureSession(CreateSpeechAudio());
         var overlay = new FakeOverlay();
+        var foreground = new FakeForegroundTargetService();
+        var insertion = new FakeTextInsertionService();
         await using var controller = new LiveDictationController(
             new FakeCaptureService(session),
             new FakeTranscriptionEngine(" hello world "),
             new FakeTextProcessor(text => text.Trim() + "!"),
+            foreground,
+            insertion,
             overlay,
             DictaCloneSettings.Default);
         string? completed = null;
@@ -43,12 +47,17 @@ public sealed class LiveDictationControllerTests
                 OverlayStatus.Recording,
                 OverlayStatus.Processing,
                 OverlayStatus.Processing,
+                OverlayStatus.Processing,
                 OverlayStatus.Success,
             ],
             overlay.Statuses);
         Assert.Equal("Finishing microphone…", overlay.Messages[1]);
         Assert.Equal("Transcribing locally…", overlay.Messages[2]);
+        Assert.Equal("Inserting text…", overlay.Messages[3]);
         Assert.Equal([0.4], overlay.Levels);
+        Assert.Equal("hello world!", insertion.Text);
+        Assert.Equal(foreground.Target, insertion.Target);
+        Assert.Equal(1, foreground.ValidationCount);
         Assert.True(session.StopCalled);
         Assert.True(session.Disposed);
     }
@@ -66,6 +75,8 @@ public sealed class LiveDictationControllerTests
             new FakeCaptureService(session),
             transcription,
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default);
 
@@ -105,6 +116,8 @@ public sealed class LiveDictationControllerTests
             new FakeCaptureService(session),
             transcription,
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default);
 
@@ -132,6 +145,8 @@ public sealed class LiveDictationControllerTests
             service,
             new FakeTranscriptionEngine("done"),
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default);
 
@@ -156,6 +171,8 @@ public sealed class LiveDictationControllerTests
             new FakeCaptureService(new InvalidOperationException("open")),
             new FakeTranscriptionEngine("unused"),
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default))
         {
@@ -168,6 +185,8 @@ public sealed class LiveDictationControllerTests
             new FakeTranscriptionEngine(
                 new InvalidOperationException("inference")),
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default))
         {
@@ -180,6 +199,151 @@ public sealed class LiveDictationControllerTests
             message => message.Contains(
                 nameof(InvalidOperationException),
                 StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ChangedForeground_PreventsInsertionAndExplainsFailure()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var foreground = new FakeForegroundTargetService
+        {
+            IsCurrent = false,
+        };
+        var insertion = new FakeTextInsertionService();
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            new FakeTranscriptionEngine("do not insert"),
+            new FakeTextProcessor(text => text),
+            foreground,
+            insertion,
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+        await controller.HandleAsync(Release);
+
+        Assert.Null(insertion.Text);
+        Assert.Null(controller.LastTranscript);
+        Assert.Contains("Focus changed", overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task TypingShortcut_ForcesDelayedTypingWithoutChangingSettings()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var insertion = new FakeTextInsertionService();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            new FakeTranscriptionEngine("typed"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            insertion,
+            new FakeOverlay(),
+            DictaCloneSettings.Default);
+        var typingPress = new HotkeyEvent(
+            HotkeyAction.TypingMode,
+            HotkeyEventKind.Pressed,
+            IsInjected: false);
+        var typingRelease = typingPress with
+        {
+            Kind = HotkeyEventKind.Released,
+        };
+
+        await controller.HandleAsync(typingPress);
+        await controller.HandleAsync(typingRelease);
+
+        Assert.Equal(TextInsertionMode.DelayedTyping, insertion.Settings!.Mode);
+        Assert.Equal(
+            TextInsertionMode.Paste,
+            DictaCloneSettings.Default.Insertion.Mode);
+    }
+
+    [Theory]
+    [InlineData(typeof(ElevatedTargetException), "elevated")]
+    [InlineData(typeof(ClipboardContentionException), "Clipboard is busy")]
+    [InlineData(typeof(InputInjectionException), "blocked text insertion")]
+    public async Task InsertionFailure_IsActionableAndDoesNotPublishCompletion(
+        Type exceptionType,
+        string expectedMessage)
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var insertion = new FakeTextInsertionService
+        {
+            Exception = exceptionType == typeof(ElevatedTargetException)
+                ? new ElevatedTargetException()
+                : exceptionType == typeof(ClipboardContentionException)
+                    ? new ClipboardContentionException()
+                    : new InputInjectionException(),
+        };
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            new FakeTranscriptionEngine("text"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            insertion,
+            overlay,
+            DictaCloneSettings.Default);
+        int completions = 0;
+        controller.TranscriptionCompleted += (_, _) => completions++;
+
+        await controller.HandleAsync(Press);
+        await controller.HandleAsync(Release);
+
+        Assert.Equal(0, completions);
+        Assert.Null(controller.LastTranscript);
+        Assert.Contains(expectedMessage, overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task ForegroundCaptureFailure_DoesNotOpenMicrophone()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var audio = new FakeCaptureService(session);
+        var foreground = new FakeForegroundTargetService
+        {
+            CaptureException = new ForegroundTargetUnavailableException(),
+        };
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            audio,
+            new FakeTranscriptionEngine("unused"),
+            new FakeTextProcessor(text => text),
+            foreground,
+            new FakeTextInsertionService(),
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+
+        Assert.Equal(0, audio.CallCount);
+        Assert.Contains("No focused app", overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task CancelDuringInsertion_CancelsAndCleansOperation()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var insertion = new BlockingTextInsertionService();
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            new FakeTranscriptionEngine("text"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            insertion,
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+        Task release = controller.HandleAsync(Release);
+        await insertion.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await controller.CancelAsync();
+        await release;
+
+        Assert.True(session.Disposed);
+        Assert.Contains("cancelled", overlay.Messages[^1]);
     }
 
     [Fact]
@@ -211,6 +375,8 @@ public sealed class LiveDictationControllerTests
             new FakeCaptureService(session),
             new FakeTranscriptionEngine("text"),
             new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
             overlay,
             DictaCloneSettings.Default);
 
@@ -359,5 +525,79 @@ public sealed class LiveDictationControllerTests
             TextProcessingSettings settings,
             CancellationToken cancellationToken) =>
             Task.FromResult(process(transcript));
+    }
+
+    private sealed class FakeForegroundTargetService : IForegroundTargetService
+    {
+        public ForegroundTarget Target { get; set; } = new(
+            "window",
+            "notepad",
+            "Notepad");
+
+        public bool IsCurrent { get; set; } = true;
+
+        public int CaptureCount { get; private set; }
+
+        public int ValidationCount { get; private set; }
+
+        public Exception? CaptureException { get; set; }
+
+        public Task<ForegroundTarget> CaptureAsync(
+            CancellationToken cancellationToken)
+        {
+            CaptureCount++;
+            return CaptureException is null
+                ? Task.FromResult(Target)
+                : Task.FromException<ForegroundTarget>(CaptureException);
+        }
+
+        public Task<bool> IsCurrentAsync(
+            ForegroundTarget target,
+            CancellationToken cancellationToken)
+        {
+            ValidationCount++;
+            return Task.FromResult(IsCurrent);
+        }
+    }
+
+    private sealed class FakeTextInsertionService : ITextInsertionService
+    {
+        public string? Text { get; private set; }
+
+        public ForegroundTarget? Target { get; private set; }
+
+        public InsertionSettings? Settings { get; private set; }
+
+        public Exception? Exception { get; set; }
+
+        public Task InsertAsync(
+            string text,
+            ForegroundTarget target,
+            InsertionSettings settings,
+            CancellationToken cancellationToken)
+        {
+            Text = text;
+            Target = target;
+            Settings = settings;
+            return Exception is null
+                ? Task.CompletedTask
+                : Task.FromException(Exception);
+        }
+    }
+
+    private sealed class BlockingTextInsertionService : ITextInsertionService
+    {
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task InsertAsync(
+            string text,
+            ForegroundTarget target,
+            InsertionSettings settings,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 }

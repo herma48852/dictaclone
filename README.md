@@ -11,16 +11,16 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Planning through Milestone 2 is complete. Milestone 3 is an automated-pass
-review candidate: the tray app now captures the selected/default microphone,
-shows a live level meter, transcribes locally with a verified Whisper model,
-and displays the recognized text without persisting audio. Its 174-test clean
-regression suite passes with 96.65% Core line coverage. Live microphone and
-offline manual acceptance remain before Milestone 3 is complete.
+Milestones 0 through 4 are implemented and accepted. The tray app captures the
+microphone, transcribes locally, and inserts into the original foreground target
+through sequence-safe Paste Mode or clipboard-free Typing Mode. Its 200-test
+clean regression suite passes with 97.14% Core line coverage, and the Milestone
+4 manual insertion test passed user review.
 
 The default dictation trigger is `Ctrl+Win+Space`; the primary key prevents
 Windows' `Ctrl+Win+Arrow` virtual-desktop shortcuts from starting a recording.
-Text insertion into the focused application remains Milestone 4.
+Milestone 4 adds focus-safe clipboard paste and delayed typing into the
+original foreground application.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the proposed
 architecture, milestones, unit and regression tests, privacy constraints, and
@@ -37,7 +37,13 @@ and hook scope, automated evidence, smoke-test diagnosis, and manual acceptance
 results.
 
 See the [Milestone 3 status](docs/MILESTONE_3_STATUS.md) for audio/transcription
-scope, model/corpus evidence, and the remaining manual acceptance checklist.
+scope, model/corpus evidence, live deadlock diagnosis, and acceptance notes.
+
+See the [Milestone 4 status](docs/MILESTONE_4_STATUS.md) for cursor-insertion
+scope, test gates, and current implementation progress.
+
+See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
+cross-platform boundaries and native macOS replacements.
 
 ## Initial target
 
@@ -83,6 +89,14 @@ Run the real local speech regression and Milestone 3 manual review with:
 ```powershell
 .\scripts\Invoke-Milestone3Regression.ps1 -NoBuild
 .\scripts\Invoke-Milestone3ManualTest.ps1 -NoBuild
+```
+
+Run the focused Milestone 4 insertion regression and launch its manual review
+target with:
+
+```powershell
+.\scripts\Invoke-Milestone4Regression.ps1 -NoBuild
+.\scripts\Invoke-Milestone4ManualTest.ps1 -Target TestTarget -NoBuild
 ```
 
 Speech models, the local SDK, NuGet caches, and generated benchmark output are
