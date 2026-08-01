@@ -11,12 +11,11 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Planning, Milestone 0, and Milestone 1 are complete. Milestone 2 is an
-automated-pass review candidate: the tray application, non-activating status
-overlay, global keyboard/mouse hooks, shortcut recorder, conflict validation,
-and lifecycle safeguards are implemented. Its 137-test clean regression suite
-passes with 95.95% Core line coverage. Manual trigger/focus checks in Notepad,
-Edge, VS Code, and the test target remain before Milestone 2 is accepted.
+Planning through Milestone 2 is complete. The tray application, non-activating
+status overlay, global keyboard/mouse hooks, shortcut recorder, conflict
+validation, and lifecycle safeguards are implemented. Its 137-test clean
+regression suite passes with 95.95% Core line coverage, and the manual
+trigger/focus matrix passed in Notepad, Edge, VS Code, and the test target.
 
 Live microphone capture and transcription are not connected to the tray app
 yet; that is Milestone 3. The current app previews the trigger and overlay
@@ -32,9 +31,9 @@ measurements and model decision.
 See the [Milestone 1 results](docs/MILESTONE_1_RESULTS.md) for the workflow,
 settings, text pipeline, test, and coverage results.
 
-See the [Milestone 2 status](docs/MILESTONE_2_STATUS.md) for the implemented UI
-and hook scope, automated evidence, smoke-test diagnosis, and manual review
-checklist.
+See the [Milestone 2 results](docs/MILESTONE_2_STATUS.md) for the implemented UI
+and hook scope, automated evidence, smoke-test diagnosis, and manual acceptance
+results.
 
 ## Initial target
 
