@@ -8,6 +8,7 @@ namespace DictaClone.Audio;
 public static class PcmAudioConverter
 {
     public const int WhisperSampleRate = 16_000;
+    private const int ActivityWindowMilliseconds = 20;
 
     public static readonly TimeSpan DefaultMinimumSpeechDuration =
         TimeSpan.FromMilliseconds(150);
@@ -66,9 +67,13 @@ public static class PcmAudioConverter
         using var pcm = new MemoryStream();
         var sampleBuffer = new float[4096];
         Span<byte> encoded = stackalloc byte[sizeof(short)];
-        double sumSquares = 0;
         double peak = 0;
         long sampleCount = 0;
+        long activeSampleCount = 0;
+        double activityWindowSumSquares = 0;
+        int activityWindowSampleCount = 0;
+        int activityWindowSize = WhisperSampleRate *
+            ActivityWindowMilliseconds / 1000;
         int samplesRead;
 
         while ((samplesRead = samples.Read(
@@ -81,8 +86,19 @@ public static class PcmAudioConverter
                 float sample = Math.Clamp(sampleBuffer[index], -1f, 1f);
                 double magnitude = Math.Abs((double)sample);
                 peak = Math.Max(peak, magnitude);
-                sumSquares += sample * sample;
                 sampleCount++;
+                activityWindowSumSquares += sample * sample;
+                activityWindowSampleCount++;
+
+                if (activityWindowSampleCount == activityWindowSize)
+                {
+                    activeSampleCount += CountActiveSamples(
+                        activityWindowSumSquares,
+                        activityWindowSampleCount,
+                        silenceThreshold);
+                    activityWindowSumSquares = 0;
+                    activityWindowSampleCount = 0;
+                }
 
                 short pcmSample = sample >= 1f
                     ? short.MaxValue
@@ -97,14 +113,18 @@ public static class PcmAudioConverter
             }
         }
 
+        activeSampleCount += CountActiveSamples(
+            activityWindowSumSquares,
+            activityWindowSampleCount,
+            silenceThreshold);
+
         TimeSpan duration = TimeSpan.FromSeconds(
             sampleCount / (double)WhisperSampleRate);
-        double rootMeanSquare = sampleCount == 0
-            ? 0
-            : Math.Sqrt(sumSquares / sampleCount);
+        TimeSpan activeSpeechDuration = TimeSpan.FromSeconds(
+            activeSampleCount / (double)WhisperSampleRate);
         bool isSilent =
             duration < minimumDuration ||
-            rootMeanSquare < silenceThreshold ||
+            activeSpeechDuration < minimumDuration ||
             peak == 0;
 
         return new(
@@ -113,6 +133,20 @@ public static class PcmAudioConverter
             ChannelCount: 1,
             duration,
             isSilent);
+    }
+
+    private static int CountActiveSamples(
+        double sumSquares,
+        int sampleCount,
+        double silenceThreshold)
+    {
+        if (sampleCount == 0)
+        {
+            return 0;
+        }
+
+        double rootMeanSquare = Math.Sqrt(sumSquares / sampleCount);
+        return rootMeanSquare >= silenceThreshold ? sampleCount : 0;
     }
 
     public static AudioSignalMetrics MeasureWhisperPcm16(

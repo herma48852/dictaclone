@@ -23,6 +23,7 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
     private const uint NoOwnerOrderFlag = 0x0200;
     private const uint NoSizeFlag = 0x0001;
     private const uint NoMoveFlag = 0x0002;
+    private const uint MonitorDefaultToNearest = 0x00000002;
     private static readonly nint TopmostWindow = new(-1);
 
     private readonly Border _pill;
@@ -206,9 +207,68 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
 
     private void PositionAtBottomCenter()
     {
+        nint handle = new WindowInteropHelper(this).Handle;
+        nint foreground = NativeMethods.GetForegroundWindow();
+        nint monitor = NativeMethods.MonitorFromWindow(
+            foreground == nint.Zero ? handle : foreground,
+            MonitorDefaultToNearest);
+        var monitorInfo = new NativeMethods.MonitorInfo
+        {
+            Size = unchecked((uint)Marshal.SizeOf<NativeMethods.MonitorInfo>()),
+        };
+        if (monitor != nint.Zero &&
+            NativeMethods.GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            uint dpi = foreground == nint.Zero
+                ? 96
+                : NativeMethods.GetDpiForWindow(foreground);
+            dpi = dpi == 0 ? 96 : dpi;
+            int width = checked((int)Math.Ceiling(ActualWidth * dpi / 96d));
+            int height = checked((int)Math.Ceiling(ActualHeight * dpi / 96d));
+            int margin = checked((int)Math.Round(42 * dpi / 96d));
+            (int x, int y) = CalculateBottomCenterPosition(
+                monitorInfo.WorkArea.Left,
+                monitorInfo.WorkArea.Top,
+                monitorInfo.WorkArea.Right,
+                monitorInfo.WorkArea.Bottom,
+                width,
+                height,
+                margin);
+            _ = NativeMethods.SetWindowPos(
+                handle,
+                TopmostWindow,
+                x,
+                y,
+                0,
+                0,
+                NoActivatePositionFlag |
+                NoOwnerOrderFlag |
+                NoSizeFlag);
+            return;
+        }
+
         Rect workArea = SystemParameters.WorkArea;
         Left = workArea.Left + ((workArea.Width - ActualWidth) / 2);
         Top = workArea.Bottom - ActualHeight - 42;
+    }
+
+    internal static (int X, int Y) CalculateBottomCenterPosition(
+        int left,
+        int top,
+        int right,
+        int bottom,
+        int overlayWidth,
+        int overlayHeight,
+        int bottomMargin)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(right, left);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bottom, top);
+        ArgumentOutOfRangeException.ThrowIfNegative(overlayWidth);
+        ArgumentOutOfRangeException.ThrowIfNegative(overlayHeight);
+        ArgumentOutOfRangeException.ThrowIfNegative(bottomMargin);
+        int x = left + (((right - left) - overlayWidth) / 2);
+        int y = bottom - overlayHeight - bottomMargin;
+        return (x, y);
     }
 
     private void EnsureTopmostWithoutActivation()
@@ -283,5 +343,40 @@ public sealed partial class StatusOverlayWindow : Window, IStatusOverlay
             int width,
             int height,
             uint flags);
+
+        [LibraryImport("user32.dll")]
+        internal static partial nint GetForegroundWindow();
+
+        [LibraryImport("user32.dll")]
+        internal static partial nint MonitorFromWindow(
+            nint window,
+            uint flags);
+
+        [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool GetMonitorInfo(
+            nint monitor,
+            ref MonitorInfo monitorInfo);
+
+        [LibraryImport("user32.dll")]
+        internal static partial uint GetDpiForWindow(nint window);
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct NativeRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MonitorInfo
+        {
+            public uint Size;
+            public NativeRect Monitor;
+            public NativeRect WorkArea;
+            public uint Flags;
+        }
     }
 }

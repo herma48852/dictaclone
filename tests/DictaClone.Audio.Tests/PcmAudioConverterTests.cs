@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using DictaClone.Audio;
+using DictaClone.Core.Dictation;
 using NAudio.Wave;
 
 namespace DictaClone.Audio.Tests;
@@ -108,6 +109,50 @@ public sealed class PcmAudioConverterTests
             PcmAudioConverter.MeasureWhisperPcm16([]));
     }
 
+    [Fact]
+    public void WindowedActivity_AcceptsClearSpeechWithLowWholeRecordingAverage()
+    {
+        const int sampleRate = 16_000;
+        var samples = new short[sampleRate * 5];
+        AddSineBurst(samples, sampleRate, startSeconds: 1, durationSeconds: 0.2);
+        AddSineBurst(samples, sampleRate, startSeconds: 3, durationSeconds: 0.2);
+        byte[] source = new byte[samples.Length * sizeof(short)];
+        Buffer.BlockCopy(samples, 0, source, 0, source.Length);
+
+        CapturedAudio result = PcmAudioConverter.ConvertToWhisperPcm16(
+            source,
+            new WaveFormat(sampleRate, bits: 16, channels: 1),
+            silenceThreshold: 0.012);
+        AudioSignalMetrics metrics =
+            PcmAudioConverter.MeasureWhisperPcm16(result.Pcm16.Span);
+
+        Assert.InRange(metrics.RootMeanSquare, 0.007, 0.009);
+        Assert.InRange(metrics.Peak, 0.039, 0.041);
+        Assert.False(result.IsSilent);
+    }
+
+    [Fact]
+    public void WindowedActivity_RejectsBriefNoiseShorterThanMinimumSpeech()
+    {
+        const int sampleRate = 16_000;
+        var samples = new short[sampleRate * 5];
+        int burstStart = sampleRate;
+        Array.Fill(
+            samples,
+            (short)(short.MaxValue / 2),
+            burstStart,
+            sampleRate / 10);
+        byte[] source = new byte[samples.Length * sizeof(short)];
+        Buffer.BlockCopy(samples, 0, source, 0, source.Length);
+
+        CapturedAudio result = PcmAudioConverter.ConvertToWhisperPcm16(
+            source,
+            new WaveFormat(sampleRate, bits: 16, channels: 1),
+            silenceThreshold: 0.012);
+
+        Assert.True(result.IsSilent);
+    }
+
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(-0.1)]
@@ -119,5 +164,22 @@ public sealed class PcmAudioConverterTests
                 new byte[2],
                 new WaveFormat(16_000, bits: 16, channels: 1),
                 threshold));
+    }
+
+    private static void AddSineBurst(
+        short[] destination,
+        int sampleRate,
+        double startSeconds,
+        double durationSeconds)
+    {
+        int start = checked((int)(startSeconds * sampleRate));
+        int count = checked((int)(durationSeconds * sampleRate));
+        for (int index = 0; index < count; index++)
+        {
+            double sample = 0.04 * Math.Sin(
+                2 * Math.PI * 220 * index / sampleRate);
+            destination[start + index] = checked((short)Math.Round(
+                sample * short.MaxValue));
+        }
     }
 }

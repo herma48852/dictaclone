@@ -7,6 +7,7 @@ public sealed class TrayIconService : IDisposable
 {
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly Forms.ContextMenuStrip _menu;
+    private readonly Forms.ToolStripItem _copyLastItem;
     private bool _disposed;
 
     public TrayIconService()
@@ -16,6 +17,15 @@ public sealed class TrayIconService : IDisposable
             "Open settings",
             image: null,
             (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
+        _copyLastItem = _menu.Items.Add(
+            "Copy last result",
+            image: null,
+            (_, _) => CopyLastRequested?.Invoke(this, EventArgs.Empty));
+        _copyLastItem.Enabled = false;
+        _menu.Items.Add(
+            "Transcript history",
+            image: null,
+            (_, _) => HistoryRequested?.Invoke(this, EventArgs.Empty));
         _menu.Items.Add(new Forms.ToolStripSeparator());
         _menu.Items.Add(
             "Exit DictaClone",
@@ -36,6 +46,16 @@ public sealed class TrayIconService : IDisposable
     public event EventHandler? SettingsRequested;
 
     public event EventHandler? ExitRequested;
+
+    public event EventHandler? CopyLastRequested;
+
+    public event EventHandler? HistoryRequested;
+
+    public void SetCopyLastAvailable(bool available)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _copyLastItem.Enabled = available;
+    }
 
     public void ShowNotification(
         string title,

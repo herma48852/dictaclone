@@ -17,15 +17,28 @@ internal sealed partial class SendInputKeyboardInjector : IKeyboardInjector
     private const ushort VirtualKeyMenu = 0x12;
     private const ushort VirtualKeyShift = 0x10;
     private const ushort VirtualKeyV = 0x56;
+    private const ushort VirtualKeyY = 0x59;
 
     internal static int InputStructureSize => Marshal.SizeOf<NativeInput>();
 
-    public void SendPaste() => SendVirtualKeyChord(
-        VirtualKeyV,
-        shift: false,
-        control: true,
-        alt: false,
-        useScanCodes: false);
+    public void SendClipboardInsert(ClipboardInsertionShortcut shortcut)
+    {
+        ushort virtualKey = shortcut switch
+        {
+            ClipboardInsertionShortcut.StandardPaste => VirtualKeyV,
+            ClipboardInsertionShortcut.EmacsYank => VirtualKeyY,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(shortcut),
+                shortcut,
+                "Unknown clipboard insertion shortcut."),
+        };
+        SendVirtualKeyChord(
+            virtualKey,
+            shift: false,
+            control: true,
+            alt: false,
+            useScanCodes: false);
+    }
 
     public void SendUnicode(string text)
     {

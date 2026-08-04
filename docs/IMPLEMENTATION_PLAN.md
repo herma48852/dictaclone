@@ -253,7 +253,10 @@ Deliver:
 Exit gate:
 
 - Automated end-to-end insertion passes for single line, multiline, punctuation, non-ASCII text, emoji/surrogate pairs, and long text in `DictaClone.TestTarget`.
-- The clipboard is preserved in Paste mode and untouched in Typing Mode.
+- The clipboard is preserved in Paste mode and untouched in Typing Mode, except
+  for documented target-specific compatibility adapters that use the same
+  snapshot, sequence-check, and restoration transaction. Native GNU Emacs uses
+  such an adapter with its `C-y` (`yank`) command.
 - Manual compatibility checks pass in Notepad, Edge/Chrome, VS Code, Windows Terminal, Word/Outlook if installed, and an available RDP/Citrix session.
 
 ### Milestone 5 — Knowledge, settings, recovery, and polish
@@ -311,7 +314,9 @@ Use xUnit with ordinary .NET assertions and deterministic fakes. Unit tests must
 Primary suites:
 
 - State machine: legal/illegal transitions, key repeat, rapid press/release, cancel in every state, overlapping triggers, shutdown during work.
-- Audio logic: PCM conversion, channel mixing, sample counts, duration, RMS/peak calculation, silence threshold, buffer limits.
+- Audio logic: PCM conversion, channel mixing, sample counts, duration, RMS/peak
+  calculation, windowed minimum speech activity, silence threshold, and buffer
+  limits.
 - Text logic: whitespace, punctuation, casing, correction phrases, vocabulary boundaries, expansions, multiline/code preservation, Unicode.
 - Settings: defaults, validation, unknown fields, schema migrations, atomic-write recovery.
 - Hotkeys: normalization, left/right modifiers, modifier-only chords, collisions, toggle semantics, injected-event filtering.

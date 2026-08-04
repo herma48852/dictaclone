@@ -1,4 +1,5 @@
 using System.Net.Http;
+using DictaClone.Audio;
 using DictaClone.Core.Contracts;
 using DictaClone.Core.Dictation;
 using DictaClone.Core.Hotkeys;
@@ -60,6 +61,9 @@ public sealed class LiveDictationController : IAsyncDisposable
 
     public event EventHandler<TranscriptionCompletedEventArgs>?
         TranscriptionCompleted;
+
+    public event EventHandler<TranscriptAvailableEventArgs>?
+        TranscriptAvailable;
 
     public string? LastTranscript { get; private set; }
 
@@ -281,7 +285,8 @@ public sealed class LiveDictationController : IAsyncDisposable
                     InitialPrompt =
                         settings.Transcription.InitialPrompt ??
                         WhisperPromptBuilder.FromVocabulary(
-                            settings.Text.Vocabulary),
+                            settings.Text.Vocabulary,
+                            settings.Text.WorkDomain),
                 };
             string transcript = await _transcription
                 .TranscribeAsync(audio, transcriptionSettings, token)
@@ -301,6 +306,9 @@ public sealed class LiveDictationController : IAsyncDisposable
                     "No speech detected"));
                 return;
             }
+
+            LastTranscript = finalText;
+            Post(() => PublishAvailable(finalText));
 
             bool targetIsCurrent = await _foregroundTarget
                 .IsCurrentAsync(target!, token)
@@ -324,7 +332,6 @@ public sealed class LiveDictationController : IAsyncDisposable
                 .InsertAsync(finalText, target!, insertionSettings, token)
                 .ConfigureAwait(false);
 
-            LastTranscript = finalText;
             Post(() =>
             {
                 _overlay.ShowStatus(
@@ -439,6 +446,24 @@ public sealed class LiveDictationController : IAsyncDisposable
         }
     }
 
+    private void PublishAvailable(string transcript)
+    {
+        Delegate[] handlers = TranscriptAvailable?.GetInvocationList() ?? [];
+        foreach (Delegate handler in handlers)
+        {
+            try
+            {
+                ((EventHandler<TranscriptAvailableEventArgs>)handler)(
+                    this,
+                    new(transcript));
+            }
+            catch (Exception)
+            {
+                // Recovery observers cannot invalidate a completed transcript.
+            }
+        }
+    }
+
     private void Post(Action action)
     {
         try
@@ -470,6 +495,8 @@ public sealed class LiveDictationController : IAsyncDisposable
     private static string GetFailureLabel(Exception exception) =>
         exception switch
         {
+            AudioCaptureDeviceException =>
+                "Microphone unavailable; check the selected device and Windows microphone privacy settings",
             ModelIntegrityException => "Speech model verification failed",
             HttpRequestException => "Speech model is unavailable offline",
             ForegroundTargetUnavailableException =>
@@ -492,6 +519,12 @@ public sealed class LiveDictationController : IAsyncDisposable
 }
 
 public sealed class TranscriptionCompletedEventArgs(string transcript)
+    : EventArgs
+{
+    public string Transcript { get; } = transcript;
+}
+
+public sealed class TranscriptAvailableEventArgs(string transcript)
     : EventArgs
 {
     public string Transcript { get; } = transcript;

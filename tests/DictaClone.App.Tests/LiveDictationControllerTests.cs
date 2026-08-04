@@ -1,4 +1,5 @@
 using DictaClone.App.Presentation;
+using DictaClone.Audio;
 using DictaClone.Core.Contracts;
 using DictaClone.Core.Dictation;
 using DictaClone.Core.Hotkeys;
@@ -202,6 +203,25 @@ public sealed class LiveDictationControllerTests
     }
 
     [Fact]
+    public async Task MicrophoneFailure_ProvidesDeviceAndPermissionGuidance()
+    {
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(new AudioCaptureDeviceException("denied")),
+            new FakeTranscriptionEngine("unused"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+
+        Assert.Contains("Microphone unavailable", overlay.Messages[^1]);
+        Assert.Contains("privacy settings", overlay.Messages[^1]);
+    }
+
+    [Fact]
     public async Task ChangedForeground_PreventsInsertionAndExplainsFailure()
     {
         var session = new FakeCaptureSession(CreateSpeechAudio());
@@ -219,12 +239,19 @@ public sealed class LiveDictationControllerTests
             insertion,
             overlay,
             DictaCloneSettings.Default);
+        string? available = null;
+        int completions = 0;
+        controller.TranscriptAvailable +=
+            (_, eventArgs) => available = eventArgs.Transcript;
+        controller.TranscriptionCompleted += (_, _) => completions++;
 
         await controller.HandleAsync(Press);
         await controller.HandleAsync(Release);
 
         Assert.Null(insertion.Text);
-        Assert.Null(controller.LastTranscript);
+        Assert.Equal("do not insert", controller.LastTranscript);
+        Assert.Equal("do not insert", available);
+        Assert.Equal(0, completions);
         Assert.Contains("Focus changed", overlay.Messages[^1]);
     }
 
@@ -286,13 +313,20 @@ public sealed class LiveDictationControllerTests
             overlay,
             DictaCloneSettings.Default);
         int completions = 0;
+        int available = 0;
         controller.TranscriptionCompleted += (_, _) => completions++;
+        controller.TranscriptAvailable += (_, eventArgs) =>
+        {
+            Assert.Equal("text", eventArgs.Transcript);
+            available++;
+        };
 
         await controller.HandleAsync(Press);
         await controller.HandleAsync(Release);
 
         Assert.Equal(0, completions);
-        Assert.Null(controller.LastTranscript);
+        Assert.Equal(1, available);
+        Assert.Equal("text", controller.LastTranscript);
         Assert.Contains(expectedMessage, overlay.Messages[^1]);
     }
 

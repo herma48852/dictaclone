@@ -9,9 +9,10 @@ public sealed record DictaCloneSettings(
     TranscriptionSettings Transcription,
     TextProcessingSettings Text,
     InsertionSettings Insertion,
-    ImmutableArray<HotkeyBinding> Hotkeys)
+    ImmutableArray<HotkeyBinding> Hotkeys,
+    ApplicationPreferences Preferences)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public static DictaCloneSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -20,9 +21,15 @@ public sealed record DictaCloneSettings(
         new TextProcessingSettings(
             ImmutableArray<VocabularyEntry>.Empty,
             ImmutableArray<TextExpansion>.Empty,
-            EnableCorrections: true),
+            EnableCorrections: true,
+            WorkDomainPreset.General),
         new InsertionSettings(TextInsertionMode.Paste, TimeSpan.FromMilliseconds(10)),
-        HotkeyDefaults.Bindings);
+        HotkeyDefaults.Bindings,
+        new ApplicationPreferences(
+            FirstRunCompleted: false,
+            StartWithWindows: false,
+            HistoryEnabled: false,
+            HistoryLimit: 100));
 }
 
 public sealed record AudioSettings(
@@ -39,11 +46,20 @@ public sealed record TranscriptionSettings(
 public sealed record TextProcessingSettings(
     ImmutableArray<VocabularyEntry> Vocabulary,
     ImmutableArray<TextExpansion> Expansions,
-    bool EnableCorrections);
+    bool EnableCorrections,
+    WorkDomainPreset WorkDomain = WorkDomainPreset.General);
 
 public sealed record VocabularyEntry(string SpokenForm, string WrittenForm);
 
 public sealed record TextExpansion(string Trigger, string Replacement);
+
+public enum WorkDomainPreset
+{
+    General,
+    SoftwareDevelopment,
+    Business,
+    Academic,
+}
 
 public enum TextInsertionMode
 {
@@ -54,3 +70,9 @@ public enum TextInsertionMode
 public sealed record InsertionSettings(
     TextInsertionMode Mode,
     TimeSpan CharacterDelay);
+
+public sealed record ApplicationPreferences(
+    bool FirstRunCompleted,
+    bool StartWithWindows,
+    bool HistoryEnabled,
+    int HistoryLimit);

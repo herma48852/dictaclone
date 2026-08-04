@@ -48,7 +48,10 @@ internal static class Program
                 {
                     controller = new(
                         application,
-                        enableModelWarmup: !smokeTest);
+                        enableModelWarmup: !smokeTest,
+                        enablePersistentState: !smokeTest,
+                        enableFirstRunUi: !smokeTest,
+                        enableSystemIntegration: !smokeTest);
                     await controller.StartAsync(CancellationToken.None);
 
                     if (smokeTest)

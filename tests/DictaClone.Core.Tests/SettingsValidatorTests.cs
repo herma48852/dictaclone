@@ -17,6 +17,14 @@ public sealed class SettingsValidatorTests
         Assert.Equal(TextInsertionMode.Paste, settings.Insertion.Mode);
         Assert.True(settings.Text.EnableCorrections);
         Assert.Null(settings.Audio.DeviceId);
+        Assert.Equal(
+            DictaCloneSettings.CurrentSchemaVersion,
+            settings.SchemaVersion);
+        Assert.Equal(WorkDomainPreset.General, settings.Text.WorkDomain);
+        Assert.False(settings.Preferences.FirstRunCompleted);
+        Assert.False(settings.Preferences.StartWithWindows);
+        Assert.False(settings.Preferences.HistoryEnabled);
+        Assert.Equal(100, settings.Preferences.HistoryLimit);
     }
 
     [Fact]
@@ -210,5 +218,40 @@ public sealed class SettingsValidatorTests
             error =>
                 error.Path == "Transcription.InitialPrompt" &&
                 error.Code == "length");
+    }
+
+    [Fact]
+    public void NewEnumAndPreferenceValues_AreValidated()
+    {
+        DictaCloneSettings settings = DictaCloneSettings.Default with
+        {
+            Text = DictaCloneSettings.Default.Text with
+            {
+                WorkDomain = (WorkDomainPreset)999,
+            },
+            Insertion = DictaCloneSettings.Default.Insertion with
+            {
+                Mode = (TextInsertionMode)999,
+            },
+            Preferences = DictaCloneSettings.Default.Preferences with
+            {
+                HistoryLimit = 501,
+            },
+        };
+
+        var errors = SettingsValidator.Validate(settings);
+
+        Assert.Contains(
+            errors,
+            error => error.Path == "Text.WorkDomain" &&
+                error.Code == "invalid");
+        Assert.Contains(
+            errors,
+            error => error.Path == "Insertion.Mode" &&
+                error.Code == "invalid");
+        Assert.Contains(
+            errors,
+            error => error.Path == "Preferences.HistoryLimit" &&
+                error.Code == "range");
     }
 }

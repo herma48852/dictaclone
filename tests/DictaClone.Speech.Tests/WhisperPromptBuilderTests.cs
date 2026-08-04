@@ -33,4 +33,18 @@ public sealed class WhisperPromptBuilderTests
         Assert.Throws<ArgumentNullException>(
             () => WhisperPromptBuilder.FromVocabulary(null!));
     }
+
+    [Fact]
+    public void WorkDomain_AddsBoundedPromptTermsWithoutCustomVocabulary()
+    {
+        string prompt = Assert.IsType<string>(
+            WhisperPromptBuilder.FromVocabulary(
+                [],
+                WorkDomainPreset.SoftwareDevelopment));
+
+        Assert.Contains("Software development", prompt);
+        Assert.Contains("C#", prompt);
+        Assert.Contains("Kubernetes", prompt);
+        Assert.True(prompt.Length <= WhisperPromptBuilder.MaximumPromptLength);
+    }
 }

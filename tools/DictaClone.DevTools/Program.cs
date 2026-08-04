@@ -25,6 +25,8 @@ internal static class Program
                 "devices" => ListDevices(),
                 "capture" => await CaptureAsync(args).ConfigureAwait(false),
                 "capture-pcm" => await CapturePcmAsync(args).ConfigureAwait(false),
+                "capture-transcribe" => await CaptureTranscribeAsync(args)
+                    .ConfigureAwait(false),
                 "benchmark" => await BenchmarkAsync(args).ConfigureAwait(false),
                 "transcribe" => await TranscribeAsync(args).ConfigureAwait(false),
                 "speech-regression" => await SpeechRegressionAsync(args)
@@ -142,6 +144,7 @@ internal static class Program
               devices
               capture [seconds]
               capture-pcm [seconds] [device-id]
+              capture-transcribe [seconds] [model-name] [device-id]
               benchmark <wave> <expected.txt> <output.json> <model-name> <model-path> [<model-name> <model-path>...]
               transcribe <wave> <model-name> [model-directory]
               speech-regression <wave> <expected.txt> <model-name> <max-wer> [model-directory]
@@ -169,6 +172,78 @@ internal static class Program
         }
 
         string? deviceId = args.Length == 3 ? args[2] : null;
+        LiveCaptureProbe probe = await CaptureLivePcmAsync(seconds, deviceId)
+            .ConfigureAwait(false);
+        CapturedAudio audio = probe.Audio;
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            audio.SampleRate,
+            audio.ChannelCount,
+            audio.Duration,
+            PcmBytes = audio.Pcm16.Length,
+            audio.IsSilent,
+            probe.MaximumLevel,
+        }, JsonOptions));
+        return audio.Pcm16.IsEmpty ? 4 : 0;
+    }
+
+    private static async Task<int> CaptureTranscribeAsync(string[] args)
+    {
+        if (args.Length > 4)
+        {
+            return ShowUsage();
+        }
+
+        double seconds = args.Length >= 2
+            ? double.Parse(
+                args[1],
+                System.Globalization.CultureInfo.InvariantCulture)
+            : 5;
+        if (seconds is <= 0 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(args),
+                "Capture duration must be greater than zero and no more than ten seconds.");
+        }
+
+        string model = args.Length >= 3 ? args[2] : "base.en";
+        string? deviceId = args.Length == 4 ? args[3] : null;
+        LiveCaptureProbe probe = await CaptureLivePcmAsync(seconds, deviceId)
+            .ConfigureAwait(false);
+        CapturedAudio audio = probe.Audio;
+        string transcript = string.Empty;
+
+        if (!audio.IsSilent && !audio.Pcm16.IsEmpty)
+        {
+            using var manager = new WhisperModelManager(
+                WhisperModelStorage.ResolveDefaultDirectory());
+            await using var engine = new WhisperTranscriptionEngine(manager);
+            transcript = await engine.TranscribeAsync(
+                    audio,
+                    new(model, "en", WorkerThreads: 0),
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+
+        AudioSignalMetrics metrics = PcmAudioConverter.MeasureWhisperPcm16(
+            audio.Pcm16.Span);
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            audio.Duration,
+            PcmBytes = audio.Pcm16.Length,
+            audio.IsSilent,
+            metrics.RootMeanSquare,
+            metrics.Peak,
+            probe.MaximumLevel,
+            Transcript = transcript,
+        }, JsonOptions));
+        return string.IsNullOrWhiteSpace(transcript) ? 3 : 0;
+    }
+
+    private static async Task<LiveCaptureProbe> CaptureLivePcmAsync(
+        double seconds,
+        string? deviceId)
+    {
         var service = new WasapiAudioCaptureService();
         IAudioCaptureSession session = await service.StartAsync(
                 new(
@@ -190,18 +265,13 @@ internal static class Program
             CapturedAudio audio = await session
                 .StopAsync(CancellationToken.None)
                 .ConfigureAwait(false);
-            Console.WriteLine(JsonSerializer.Serialize(new
-            {
-                audio.SampleRate,
-                audio.ChannelCount,
-                audio.Duration,
-                PcmBytes = audio.Pcm16.Length,
-                audio.IsSilent,
-                MaximumLevel = maximumLevel,
-            }, JsonOptions));
-            return audio.Pcm16.IsEmpty ? 4 : 0;
+            return new(audio, maximumLevel);
         }
     }
+
+    private sealed record LiveCaptureProbe(
+        CapturedAudio Audio,
+        double MaximumLevel);
 
     private static async Task<int> TranscribeAsync(string[] args)
     {

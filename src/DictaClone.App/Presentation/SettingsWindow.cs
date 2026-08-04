@@ -1,19 +1,30 @@
 using System.Collections;
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using DictaClone.Audio;
 using DictaClone.Core.Hotkeys;
 using DictaClone.Core.Settings;
 using DictaClone.Speech;
 using DictaClone.Windows.Input;
+using WpfBinding = System.Windows.Data.Binding;
 using WpfButton = System.Windows.Controls.Button;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
+using WpfLabel = System.Windows.Controls.Label;
 using WpfListBox = System.Windows.Controls.ListBox;
+using WpfOpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using WpfOrientation = System.Windows.Controls.Orientation;
+using WpfSaveFileDialog = Microsoft.Win32.SaveFileDialog;
 using WpfSlider = System.Windows.Controls.Slider;
+using WpfTabControl = System.Windows.Controls.TabControl;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace DictaClone.App.Presentation;
 
@@ -36,6 +47,14 @@ public sealed class SettingsWindow : Window
     private readonly WpfComboBox _insertionMode;
     private readonly WpfSlider _characterDelay;
     private readonly TextBlock _characterDelayLabel;
+    private readonly ObservableCollection<EditablePair> _vocabularyEntries;
+    private readonly ObservableCollection<EditablePair> _expansionEntries;
+    private readonly WpfComboBox _workDomain;
+    private readonly WpfCheckBox _startWithWindows;
+    private readonly WpfCheckBox _historyEnabled;
+    private readonly WpfTextBox _historyLimit;
+    private readonly TextBlock _knowledgeValidation;
+    private readonly TextBlock _preferenceValidation;
     private ShortcutRecordingSession? _recording;
     private HotkeyChord? _candidateChord;
 
@@ -44,7 +63,10 @@ public sealed class SettingsWindow : Window
         AudioSettings? audioSettings = null,
         TranscriptionSettings? transcriptionSettings = null,
         IReadOnlyList<MicrophoneDeviceInfo>? audioDevices = null,
-        InsertionSettings? insertionSettings = null)
+        InsertionSettings? insertionSettings = null,
+        TextProcessingSettings? textSettings = null,
+        ApplicationPreferences? preferences = null,
+        bool firstRun = false)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         _bindings = [.. bindings];
@@ -52,14 +74,24 @@ public sealed class SettingsWindow : Window
         Transcription =
             transcriptionSettings ?? DictaCloneSettings.Default.Transcription;
         Insertion = insertionSettings ?? DictaCloneSettings.Default.Insertion;
+        Text = textSettings ?? DictaCloneSettings.Default.Text;
+        Preferences = preferences ?? DictaCloneSettings.Default.Preferences;
+        _vocabularyEntries = new(Text.Vocabulary.Select(entry =>
+            new EditablePair(entry.SpokenForm, entry.WrittenForm)));
+        _expansionEntries = new(Text.Expansions.Select(entry =>
+            new EditablePair(entry.Trigger, entry.Replacement)));
         audioDevices ??= [];
 
-        Title = "DictaClone settings";
-        Width = 680;
-        Height = 720;
-        MinWidth = 600;
+        Title = firstRun
+            ? "DictaClone first-run setup"
+            : "DictaClone settings";
+        Width = 820;
+        Height = 760;
+        MinWidth = 680;
         MinHeight = 650;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        UseLayoutRounding = true;
+        SnapsToDevicePixels = true;
 
         var root = new Grid
         {
@@ -79,7 +111,9 @@ public sealed class SettingsWindow : Window
         });
         heading.Children.Add(new TextBlock
         {
-            Text = "Changes apply for this run. Persistent settings arrive in Milestone 5.",
+            Text = firstRun
+                ? "Choose a microphone and local model, then apply settings to complete setup."
+                : "Changes are saved automatically when you apply them.",
             Margin = new(0, 6, 0, 18),
             Opacity = 0.72,
         });
@@ -313,7 +347,28 @@ public sealed class SettingsWindow : Window
 
         Grid.SetRow(editor, 3);
         root.Children.Add(editor);
-        Content = root;
+        (_workDomain, _knowledgeValidation) = CreateKnowledgeTab(
+            out TabItem knowledgeTab);
+        (_startWithWindows, _historyEnabled, _historyLimit,
+            _preferenceValidation) = CreatePrivacyTab(
+                firstRun,
+                out TabItem privacyTab);
+        var tabs = new WpfTabControl
+        {
+            Margin = new(12),
+        };
+        AutomationProperties.SetName(tabs, "DictaClone settings sections");
+        KeyboardNavigation.SetTabNavigation(
+            tabs,
+            KeyboardNavigationMode.Local);
+        tabs.Items.Add(new TabItem
+        {
+            Header = "General",
+            Content = root,
+        });
+        tabs.Items.Add(knowledgeTab);
+        tabs.Items.Add(privacyTab);
+        Content = tabs;
 
         _action.SelectionChanged += (_, _) => SelectCurrentBinding();
         _recordButton.Click += (_, _) => BeginRecording();
@@ -336,6 +391,23 @@ public sealed class SettingsWindow : Window
     public event EventHandler<AudioSpeechSettingsChangedEventArgs>?
         AudioSpeechSettingsChanged;
 
+    public event EventHandler<TextSettingsChangedEventArgs>?
+        TextSettingsChanged;
+
+    public event EventHandler<PreferencesChangedEventArgs>?
+        PreferencesChanged;
+
+    public event EventHandler<SettingsTransferRequestedEventArgs>?
+        SettingsImportRequested;
+
+    public event EventHandler<SettingsTransferRequestedEventArgs>?
+        SettingsExportRequested;
+
+    public event EventHandler<SettingsTransferRequestedEventArgs>?
+        SupportBundleRequested;
+
+    public event EventHandler? MicrophonePermissionHelpRequested;
+
     public ImmutableArray<HotkeyBinding> Bindings => [.. _bindings];
 
     public AudioSettings Audio { get; private set; }
@@ -343,6 +415,10 @@ public sealed class SettingsWindow : Window
     public TranscriptionSettings Transcription { get; private set; }
 
     public InsertionSettings Insertion { get; private set; }
+
+    public TextProcessingSettings Text { get; private set; }
+
+    public ApplicationPreferences Preferences { get; private set; }
 
     protected override void OnPreviewKeyDown(WpfKeyEventArgs e)
     {
@@ -401,14 +477,471 @@ public sealed class SettingsWindow : Window
         int column)
     {
         var panel = new StackPanel();
-        panel.Children.Add(new TextBlock
+        panel.Children.Add(new WpfLabel
         {
-            Text = label,
+            Content = label,
+            Target = control,
             FontWeight = FontWeights.SemiBold,
+            Padding = new(0),
         });
         panel.Children.Add(control);
         Grid.SetColumn(panel, column);
         grid.Children.Add(panel);
+    }
+
+    private (WpfComboBox Domain, TextBlock Validation) CreateKnowledgeTab(
+        out TabItem tab)
+    {
+        var root = new Grid
+        {
+            Margin = new(18),
+        };
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new()
+        {
+            Height = new(1, GridUnitType.Star),
+        });
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+
+        root.Children.Add(new TextBlock
+        {
+            Text = "Knowledge and text expansion",
+            FontSize = 22,
+            FontWeight = FontWeights.SemiBold,
+        });
+
+        var domain = CreateComboBox(
+            Enum.GetValues<WorkDomainPreset>()
+                .Select(value => new WorkDomainOption(
+                    value,
+                    WorkDomainCatalog.GetDisplayName(value)))
+                .ToArray());
+        domain.SelectedItem = domain.Items
+            .Cast<WorkDomainOption>()
+            .First(option => option.Value == Text.WorkDomain);
+        AutomationProperties.SetName(domain, "Work domain preset");
+        var domainPanel = new StackPanel
+        {
+            Margin = new(0, 12, 0, 12),
+        };
+        domainPanel.Children.Add(new WpfLabel
+        {
+            Content = "Work domain",
+            Target = domain,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new(0),
+        });
+        domainPanel.Children.Add(domain);
+        domainPanel.Children.Add(new TextBlock
+        {
+            Text = "Presets add local recognition hints; custom entries remain authoritative.",
+            Opacity = 0.72,
+            Margin = new(0, 4, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        });
+        Grid.SetRow(domainPanel, 1);
+        root.Children.Add(domainPanel);
+
+        WpfDataGrid vocabulary = CreatePairGrid(
+            "Vocabulary entries",
+            "Spoken form",
+            "Written form",
+            _vocabularyEntries);
+        WpfDataGrid expansions = CreatePairGrid(
+            "Text expansion entries",
+            "Trigger",
+            "Replacement",
+            _expansionEntries);
+        var editors = new Grid();
+        editors.ColumnDefinitions.Add(new()
+        {
+            Width = new(1, GridUnitType.Star),
+        });
+        editors.ColumnDefinitions.Add(new()
+        {
+            Width = new(1, GridUnitType.Star),
+        });
+        editors.Children.Add(CreatePairEditor(
+            "Vocabulary",
+            "Correct recurring names and technical terms.",
+            vocabulary,
+            _vocabularyEntries));
+        UIElement expansionEditor = CreatePairEditor(
+            "Expansions",
+            "Replace an exact spoken trigger with reusable text.",
+            expansions,
+            _expansionEntries);
+        Grid.SetColumn(expansionEditor, 1);
+        editors.Children.Add(expansionEditor);
+        Grid.SetRow(editors, 2);
+        root.Children.Add(editors);
+
+        var footer = new StackPanel
+        {
+            Margin = new(0, 12, 0, 0),
+        };
+        var apply = CreateActionButton("Apply knowledge");
+        apply.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+        apply.Click += (_, _) => ApplyKnowledgeSettings();
+        footer.Children.Add(apply);
+        var validation = new TextBlock
+        {
+            Margin = new(0, 8, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        footer.Children.Add(validation);
+        Grid.SetRow(footer, 3);
+        root.Children.Add(footer);
+
+        tab = new()
+        {
+            Header = "Knowledge",
+            Content = root,
+        };
+        return (domain, validation);
+    }
+
+    private (
+        WpfCheckBox StartWithWindows,
+        WpfCheckBox HistoryEnabled,
+        WpfTextBox HistoryLimit,
+        TextBlock Validation) CreatePrivacyTab(
+        bool firstRun,
+        out TabItem tab)
+    {
+        var panel = new StackPanel
+        {
+            Margin = new(18),
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = firstRun ? "Finish first-run setup" : "Privacy and recovery",
+            FontSize = 22,
+            FontWeight = FontWeights.SemiBold,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Transcript history is local, text-only, and disabled by default. " +
+                "Diagnostics never contain transcript or clipboard text.",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new(0, 6, 0, 16),
+            Opacity = 0.72,
+        });
+
+        var startWithWindows = new WpfCheckBox
+        {
+            Content = "Start DictaClone when I sign in to Windows",
+            IsChecked = Preferences.StartWithWindows,
+            Margin = new(0, 4, 0, 8),
+        };
+        var historyEnabled = new WpfCheckBox
+        {
+            Content = "Keep local transcript history",
+            IsChecked = Preferences.HistoryEnabled,
+            Margin = new(0, 4, 0, 8),
+        };
+        var historyLimit = new WpfTextBox
+        {
+            Text = Preferences.HistoryLimit.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Width = 90,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Margin = new(0, 4, 0, 12),
+        };
+        AutomationProperties.SetName(historyLimit, "Maximum history entries");
+        panel.Children.Add(startWithWindows);
+        panel.Children.Add(historyEnabled);
+        panel.Children.Add(new WpfLabel
+        {
+            Content = "Maximum history entries (1-500)",
+            Target = historyLimit,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new(0),
+        });
+        panel.Children.Add(historyLimit);
+
+        var apply = CreateActionButton(
+            firstRun ? "Complete setup" : "Apply privacy settings");
+        apply.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+        apply.Click += (_, _) => ApplyPreferences();
+        panel.Children.Add(apply);
+
+        var transferButtons = new WrapPanel
+        {
+            Margin = new(0, 18, 0, 0),
+        };
+        WpfButton import = CreateActionButton("Import settings…");
+        import.Click += (_, _) => RequestSettingsImport();
+        WpfButton export = CreateActionButton("Export settings…");
+        export.Click += (_, _) => RequestSettingsExport();
+        WpfButton bundle = CreateActionButton("Create support bundle…");
+        bundle.Click += (_, _) => RequestSupportBundle();
+        WpfButton permissions = CreateActionButton("Microphone privacy settings");
+        permissions.Click += (_, _) =>
+            MicrophonePermissionHelpRequested?.Invoke(this, EventArgs.Empty);
+        transferButtons.Children.Add(import);
+        transferButtons.Children.Add(export);
+        transferButtons.Children.Add(bundle);
+        transferButtons.Children.Add(permissions);
+        panel.Children.Add(transferButtons);
+
+        var validation = new TextBlock
+        {
+            Margin = new(0, 12, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        panel.Children.Add(validation);
+
+        tab = new()
+        {
+            Header = "Privacy & recovery",
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = panel,
+            },
+        };
+        return (startWithWindows, historyEnabled, historyLimit, validation);
+    }
+
+    private static WpfDataGrid CreatePairGrid(
+        string accessibleName,
+        string firstHeader,
+        string secondHeader,
+        ObservableCollection<EditablePair> entries)
+    {
+        var grid = new WpfDataGrid
+        {
+            ItemsSource = entries,
+            AutoGenerateColumns = false,
+            CanUserAddRows = true,
+            CanUserDeleteRows = true,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            MinHeight = 230,
+            Margin = new(0, 8, 0, 0),
+        };
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = firstHeader,
+            Binding = new WpfBinding(nameof(EditablePair.First))
+            {
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            },
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = secondHeader,
+            Binding = new WpfBinding(nameof(EditablePair.Second))
+            {
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            },
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+        });
+        AutomationProperties.SetName(grid, accessibleName);
+        return grid;
+    }
+
+    private static StackPanel CreatePairEditor(
+        string title,
+        string description,
+        WpfDataGrid grid,
+        ObservableCollection<EditablePair> entries)
+    {
+        var panel = new StackPanel
+        {
+            Margin = new(0, 0, 10, 0),
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 17,
+            FontWeight = FontWeights.SemiBold,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = description,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.72,
+        });
+        panel.Children.Add(grid);
+        var buttons = new WrapPanel
+        {
+            Margin = new(0, 8, 0, 0),
+        };
+        WpfButton add = CreateActionButton("Add row");
+        add.Click += (_, _) =>
+        {
+            var entry = new EditablePair();
+            entries.Add(entry);
+            grid.SelectedItem = entry;
+            grid.ScrollIntoView(entry);
+            _ = grid.BeginEdit();
+        };
+        WpfButton remove = CreateActionButton("Remove selected");
+        remove.Click += (_, _) =>
+        {
+            if (grid.SelectedItem is EditablePair entry)
+            {
+                _ = entries.Remove(entry);
+            }
+        };
+        buttons.Children.Add(add);
+        buttons.Children.Add(remove);
+        panel.Children.Add(buttons);
+        return panel;
+    }
+
+    private static WpfButton CreateActionButton(string text) => new()
+    {
+        Content = text,
+        MinWidth = 110,
+        Padding = new(10, 6, 10, 6),
+        Margin = new(0, 0, 8, 0),
+    };
+
+    private void ApplyKnowledgeSettings()
+    {
+        if (_workDomain.SelectedItem is not WorkDomainOption domain)
+        {
+            _knowledgeValidation.Text = "Choose a work domain.";
+            return;
+        }
+
+        if (!TryCreatePairs(
+                _vocabularyEntries,
+                out ImmutableArray<(string First, string Second)> vocabulary) ||
+            !TryCreatePairs(
+                _expansionEntries,
+                out ImmutableArray<(string First, string Second)> expansions))
+        {
+            _knowledgeValidation.Text =
+                "Each knowledge row must contain both fields or be completely blank.";
+            return;
+        }
+
+        var candidate = Text with
+        {
+            WorkDomain = domain.Value,
+            Vocabulary =
+            [
+                .. vocabulary.Select(pair =>
+                    new VocabularyEntry(pair.First, pair.Second)),
+            ],
+            Expansions =
+            [
+                .. expansions.Select(pair =>
+                    new TextExpansion(pair.First, pair.Second)),
+            ],
+        };
+        var errors = SettingsValidator.Validate(
+            DictaCloneSettings.Default with { Text = candidate });
+        SettingsValidationError? error = errors.FirstOrDefault(item =>
+            item.Path.StartsWith("Text", StringComparison.Ordinal));
+        if (error is not null)
+        {
+            _knowledgeValidation.Text = error.Message;
+            return;
+        }
+
+        Text = candidate;
+        _knowledgeValidation.Text = "Knowledge settings submitted for saving.";
+        TextSettingsChanged?.Invoke(this, new(Text));
+    }
+
+    private void ApplyPreferences()
+    {
+        if (!int.TryParse(
+                _historyLimit.Text,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out int historyLimit) ||
+            historyLimit is < 1 or > 500)
+        {
+            _preferenceValidation.Text =
+                "History limit must be a whole number from 1 through 500.";
+            return;
+        }
+
+        Preferences = new(
+            FirstRunCompleted: true,
+            StartWithWindows: _startWithWindows.IsChecked == true,
+            HistoryEnabled: _historyEnabled.IsChecked == true,
+            historyLimit);
+        _preferenceValidation.Text = "Privacy settings submitted for saving.";
+        PreferencesChanged?.Invoke(this, new(Preferences));
+    }
+
+    private static bool TryCreatePairs(
+        IEnumerable<EditablePair> source,
+        out ImmutableArray<(string First, string Second)> pairs)
+    {
+        var builder = ImmutableArray.CreateBuilder<(string, string)>();
+        foreach (EditablePair entry in source)
+        {
+            string first = entry.First?.Trim() ?? string.Empty;
+            string second = entry.Second?.Trim() ?? string.Empty;
+            if (first.Length == 0 && second.Length == 0)
+            {
+                continue;
+            }
+
+            if (first.Length == 0 || second.Length == 0)
+            {
+                pairs = [];
+                return false;
+            }
+
+            builder.Add((first, second));
+        }
+
+        pairs = builder.ToImmutable();
+        return true;
+    }
+
+    private void RequestSettingsImport()
+    {
+        var dialog = new WpfOpenFileDialog
+        {
+            Title = "Import DictaClone settings",
+            Filter = "DictaClone settings (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            SettingsImportRequested?.Invoke(this, new(dialog.FileName));
+        }
+    }
+
+    private void RequestSettingsExport()
+    {
+        var dialog = new WpfSaveFileDialog
+        {
+            Title = "Export DictaClone settings",
+            Filter = "DictaClone settings (*.json)|*.json",
+            FileName = "dictaclone-settings.json",
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            SettingsExportRequested?.Invoke(this, new(dialog.FileName));
+        }
+    }
+
+    private void RequestSupportBundle()
+    {
+        var dialog = new WpfSaveFileDialog
+        {
+            Title = "Create privacy-safe support bundle",
+            Filter = "ZIP archive (*.zip)|*.zip",
+            FileName = "dictaclone-support.zip",
+            AddExtension = true,
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            SupportBundleRequested?.Invoke(this, new(dialog.FileName));
+        }
     }
 
     private void SelectCurrentBinding()
@@ -494,7 +1027,7 @@ public sealed class SettingsWindow : Window
         _bindings.Clear();
         _bindings.AddRange(updated.OrderBy(binding => binding.Action));
         RefreshBindings();
-        _validation.Text = "Binding applied for this run.";
+        _validation.Text = "Binding submitted for saving.";
         BindingsChanged?.Invoke(this, new([.. _bindings]));
     }
 
@@ -504,7 +1037,7 @@ public sealed class SettingsWindow : Window
         _bindings.AddRange(HotkeyDefaults.Bindings);
         RefreshBindings();
         SelectCurrentBinding();
-        _validation.Text = "Default bindings restored for this run.";
+        _validation.Text = "Default bindings submitted for saving.";
         BindingsChanged?.Invoke(this, new([.. _bindings]));
     }
 
@@ -534,7 +1067,7 @@ public sealed class SettingsWindow : Window
             insertionMode,
             TimeSpan.FromMilliseconds(_characterDelay.Value));
         _validation.Text =
-            "Audio, transcription, and insertion settings applied for this run.";
+            "Audio, transcription, and insertion settings submitted for saving.";
         AudioSpeechSettingsChanged?.Invoke(
             this,
             new(Audio, Transcription, Insertion));
@@ -560,6 +1093,31 @@ public sealed class SettingsWindow : Window
     {
         public override string ToString() => DisplayName;
     }
+
+    private sealed record WorkDomainOption(
+        WorkDomainPreset Value,
+        string DisplayName)
+    {
+        public override string ToString() => DisplayName;
+    }
+
+    private sealed class EditablePair
+    {
+        public EditablePair()
+            : this(string.Empty, string.Empty)
+        {
+        }
+
+        public EditablePair(string first, string second)
+        {
+            First = first;
+            Second = second;
+        }
+
+        public string? First { get; set; }
+
+        public string? Second { get; set; }
+    }
 }
 
 public sealed record HotkeyBindingsChanged(
@@ -575,4 +1133,21 @@ public sealed class AudioSpeechSettingsChangedEventArgs(
     public TranscriptionSettings Transcription { get; } = transcription;
 
     public InsertionSettings Insertion { get; } = insertion;
+}
+
+public sealed class TextSettingsChangedEventArgs(
+    TextProcessingSettings settings) : EventArgs
+{
+    public TextProcessingSettings Settings { get; } = settings;
+}
+
+public sealed class PreferencesChangedEventArgs(
+    ApplicationPreferences preferences) : EventArgs
+{
+    public ApplicationPreferences Preferences { get; } = preferences;
+}
+
+public sealed class SettingsTransferRequestedEventArgs(string path) : EventArgs
+{
+    public string Path { get; } = path;
 }

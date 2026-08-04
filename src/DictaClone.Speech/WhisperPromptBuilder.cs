@@ -7,7 +7,8 @@ public static class WhisperPromptBuilder
     public const int MaximumPromptLength = 2048;
 
     public static string? FromVocabulary(
-        IEnumerable<VocabularyEntry> vocabulary)
+        IEnumerable<VocabularyEntry> vocabulary,
+        WorkDomainPreset workDomain = WorkDomainPreset.General)
     {
         ArgumentNullException.ThrowIfNull(vocabulary);
         string[] entries = vocabulary
@@ -19,12 +20,21 @@ public static class WhisperPromptBuilder
                 $"{entry.SpokenForm.Trim()} means {entry.WrittenForm.Trim()}")
             .ToArray();
 
+        IReadOnlyList<string> domainTerms =
+            WorkDomainCatalog.GetPromptTerms(workDomain);
+        string? domainPrompt = domainTerms.Count == 0
+            ? null
+            : $"Work domain: {WorkDomainCatalog.GetDisplayName(workDomain)}. " +
+              $"Preferred terms: {string.Join(", ", domainTerms)}.";
+
         if (entries.Length == 0)
         {
-            return null;
+            return domainPrompt;
         }
 
-        const string prefix = "Preferred vocabulary: ";
+        string prefix = domainPrompt is null
+            ? "Preferred vocabulary: "
+            : domainPrompt + " Preferred vocabulary: ";
         var accepted = new List<string>();
         int length = prefix.Length;
 

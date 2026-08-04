@@ -11,11 +11,15 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Milestones 0 through 4 are implemented and accepted. The tray app captures the
+Milestones 0 through 5 are implemented and accepted. The tray app captures the
 microphone, transcribes locally, and inserts into the original foreground target
-through sequence-safe Paste Mode or clipboard-free Typing Mode. Its 200-test
-clean regression suite passes with 97.14% Core line coverage, and the Milestone
-4 manual insertion test passed user review.
+through sequence-safe Paste Mode or normally clipboard-free Typing Mode. Native
+GNU Emacs uses a clipboard-preserving `Ctrl+Y` compatibility path because its
+standard key map does not paste with `Ctrl+V` and did not accept DictaClone's
+synthetic character stream. Milestone 5 persistence, recovery, knowledge,
+diagnostics, and desktop polish is accepted. Its 229 automated Release cases
+pass with 93.88% Core line coverage. Milestone 6 Smart Edit and selected-text
+editing is next.
 
 The default dictation trigger is `Ctrl+Win+Space`; the primary key prevents
 Windows' `Ctrl+Win+Arrow` virtual-desktop shortcuts from starting a recording.
@@ -41,6 +45,9 @@ scope, model/corpus evidence, live deadlock diagnosis, and acceptance notes.
 
 See the [Milestone 4 status](docs/MILESTONE_4_STATUS.md) for cursor-insertion
 scope, test gates, and current implementation progress.
+
+See the [Milestone 5 status](docs/MILESTONE_5_STATUS.md) for persistence,
+knowledge, recovery, diagnostics, and desktop-polish progress.
 
 See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
 cross-platform boundaries and native macOS replacements.

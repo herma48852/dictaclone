@@ -23,11 +23,61 @@ public static class SettingsValidator
                 $"Schema version must be {DictaCloneSettings.CurrentSchemaVersion}."));
         }
 
-        ValidateAudio(settings.Audio, errors);
-        ValidateTranscription(settings.Transcription, errors);
-        ValidateText(settings.Text, errors);
-        ValidateInsertion(settings.Insertion, errors);
+        if (settings.Audio is null)
+        {
+            errors.Add(new("Audio", "required", "Audio settings are required."));
+        }
+        else
+        {
+            ValidateAudio(settings.Audio, errors);
+        }
+
+        if (settings.Transcription is null)
+        {
+            errors.Add(new(
+                "Transcription",
+                "required",
+                "Transcription settings are required."));
+        }
+        else
+        {
+            ValidateTranscription(settings.Transcription, errors);
+        }
+
+        if (settings.Text is null)
+        {
+            errors.Add(new("Text", "required", "Text settings are required."));
+        }
+        else
+        {
+            ValidateText(settings.Text, errors);
+        }
+
+        if (settings.Insertion is null)
+        {
+            errors.Add(new(
+                "Insertion",
+                "required",
+                "Insertion settings are required."));
+        }
+        else
+        {
+            ValidateInsertion(settings.Insertion, errors);
+        }
+
         ValidateHotkeys(settings.Hotkeys, errors);
+
+        if (settings.Preferences is null)
+        {
+            errors.Add(new(
+                "Preferences",
+                "required",
+                "Application preferences are required."));
+        }
+        else
+        {
+            ValidatePreferences(settings.Preferences, errors);
+        }
 
         return errors.ToImmutable();
     }
@@ -93,6 +143,14 @@ public static class SettingsValidator
         TextProcessingSettings settings,
         ImmutableArray<SettingsValidationError>.Builder errors)
     {
+        if (!Enum.IsDefined(settings.WorkDomain))
+        {
+            errors.Add(new(
+                "Text.WorkDomain",
+                "invalid",
+                "Work domain must be a recognized preset."));
+        }
+
         if (settings.Vocabulary.IsDefault)
         {
             errors.Add(new(
@@ -159,6 +217,14 @@ public static class SettingsValidator
         InsertionSettings settings,
         ImmutableArray<SettingsValidationError>.Builder errors)
     {
+        if (!Enum.IsDefined(settings.Mode))
+        {
+            errors.Add(new(
+                "Insertion.Mode",
+                "invalid",
+                "Insertion mode must be recognized."));
+        }
+
         if (settings.CharacterDelay < TimeSpan.Zero ||
             settings.CharacterDelay > TimeSpan.FromMilliseconds(100))
         {
@@ -166,6 +232,19 @@ public static class SettingsValidator
                 "Insertion.CharacterDelay",
                 "range",
                 "Character delay must be between 0 and 100 milliseconds."));
+        }
+    }
+
+    private static void ValidatePreferences(
+        ApplicationPreferences settings,
+        ImmutableArray<SettingsValidationError>.Builder errors)
+    {
+        if (settings.HistoryLimit is < 1 or > 500)
+        {
+            errors.Add(new(
+                "Preferences.HistoryLimit",
+                "range",
+                "History limit must be between 1 and 500 entries."));
         }
     }
 

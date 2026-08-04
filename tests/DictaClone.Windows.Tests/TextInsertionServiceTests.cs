@@ -27,7 +27,7 @@ public sealed class TextInsertionServiceTests
         Assert.Equal("original", context.Clipboard.Value);
         Assert.Equal(1, context.Clipboard.CaptureCalls);
         Assert.Equal(1, context.Clipboard.RestoreCalls);
-        Assert.Equal(["paste"], context.Keyboard.Events);
+        Assert.Equal(["clipboard:StandardPaste"], context.Keyboard.Events);
         Assert.Equal(1, context.StaThreads.CallCount);
     }
 
@@ -128,6 +128,35 @@ public sealed class TextInsertionServiceTests
         Assert.Equal(1, context.Clipboard.RestoreCalls);
     }
 
+    [Theory]
+    [InlineData(TextInsertionMode.Paste)]
+    [InlineData(TextInsertionMode.DelayedTyping)]
+    public async Task NativeEmacs_UsesYankAndRestoresClipboard(
+        TextInsertionMode mode)
+    {
+        var context = new TestContext();
+        context.Clipboard.Value = "original";
+        ForegroundTarget emacsTarget = LocalTarget with
+        {
+            ProcessName = "EmAcS",
+            WindowClass = "Emacs",
+        };
+
+        await context.Service.InsertAsync(
+            "open the JSON file",
+            emacsTarget,
+            new(mode, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(
+            ["clipboard:EmacsYank"],
+            context.Keyboard.Events);
+        Assert.Equal("original", context.Clipboard.Value);
+        Assert.Equal(1, context.Clipboard.RestoreCalls);
+        Assert.Empty(context.Keyboard.MappingAttempts);
+        Assert.Equal(1, context.StaThreads.CallCount);
+    }
+
     [Fact]
     public async Task Typing_TokenizesUnicodeLineEndingsAndLeavesClipboardUntouched()
     {
@@ -145,6 +174,23 @@ public sealed class TextInsertionServiceTests
         Assert.Equal(5, context.Delay.AsyncWaits.Count);
         Assert.Equal(0, context.Clipboard.TotalCalls);
         Assert.Equal(0, context.StaThreads.CallCount);
+    }
+
+    [Fact]
+    public async Task Typing_PrefersPhysicalKeysForLocalTargetsWithUnicodeFallback()
+    {
+        var context = new TestContext();
+        context.Keyboard.MappableCharacters.Add('A');
+
+        await context.Service.InsertAsync(
+            "Aé",
+            LocalTarget,
+            new(TextInsertionMode.DelayedTyping, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(["mapped:A", "unicode:é"], context.Keyboard.Events);
+        Assert.Equal(['A', 'é'], context.Keyboard.MappingAttempts);
+        Assert.Equal(0, context.Clipboard.TotalCalls);
     }
 
     [Fact]
@@ -317,9 +363,9 @@ public sealed class TextInsertionServiceTests
 
         public Exception? PasteException { get; set; }
 
-        public void SendPaste()
+        public void SendClipboardInsert(ClipboardInsertionShortcut shortcut)
         {
-            Events.Add("paste");
+            Events.Add($"clipboard:{shortcut}");
             OnPaste?.Invoke();
             if (PasteException is not null)
             {

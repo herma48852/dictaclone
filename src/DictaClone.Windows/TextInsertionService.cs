@@ -78,14 +78,26 @@ public sealed class TextInsertionService : ITextInsertionService
                 "Character delay must be between zero and 100 milliseconds.");
         }
 
+        if (EmacsTargetDetector.IsNativeEmacs(target))
+        {
+            return _staThreads.RunAsync(
+                () => InsertWithClipboard(
+                    text,
+                    ClipboardInsertionShortcut.EmacsYank,
+                    cancellationToken),
+                cancellationToken);
+        }
+
         return settings.Mode switch
         {
             TextInsertionMode.Paste => _staThreads.RunAsync(
-                () => InsertWithClipboard(text, cancellationToken),
+                () => InsertWithClipboard(
+                    text,
+                    ClipboardInsertionShortcut.StandardPaste,
+                    cancellationToken),
                 cancellationToken),
             TextInsertionMode.DelayedTyping => TypeAsync(
                 text,
-                target,
                 settings.CharacterDelay,
                 cancellationToken),
             _ => throw new ArgumentOutOfRangeException(
@@ -97,6 +109,7 @@ public sealed class TextInsertionService : ITextInsertionService
 
     private void InsertWithClipboard(
         string text,
+        ClipboardInsertionShortcut shortcut,
         CancellationToken cancellationToken)
     {
         ClipboardSnapshot snapshot = CaptureStableSnapshot(cancellationToken);
@@ -108,7 +121,7 @@ public sealed class TextInsertionService : ITextInsertionService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _keyboard.SendPaste();
+            _keyboard.SendClipboardInsert(shortcut);
             _delay.Wait(_clipboardRestoreDelay, cancellationToken);
         }
         finally
@@ -189,12 +202,10 @@ public sealed class TextInsertionService : ITextInsertionService
 
     private async Task TypeAsync(
         string text,
-        ForegroundTarget target,
         TimeSpan characterDelay,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<TextInputToken> tokens = TextInputPlanner.Tokenize(text);
-        bool preferScanCodes = RemoteTargetDetector.IsRemote(target);
 
         for (int index = 0; index < tokens.Count; index++)
         {
@@ -204,7 +215,6 @@ public sealed class TextInsertionService : ITextInsertionService
             {
                 case TextInputTokenKind.Text:
                     bool sentMapped =
-                        preferScanCodes &&
                         token.Value.Length == 1 &&
                         _keyboard.TrySendMappedCharacter(token.Value[0]);
                     if (!sentMapped)
@@ -234,30 +244,13 @@ public sealed class TextInsertionService : ITextInsertionService
     }
 }
 
-internal static class RemoteTargetDetector
+internal static class EmacsTargetDetector
 {
-    private static readonly string[] RemoteProcessMarkers =
-    [
-        "mstsc",
-        "msrdc",
-        "wfica32",
-        "vmware-view",
-        "vmware",
-    ];
-
-    private static readonly string[] RemoteClassMarkers =
-    [
-        "TscShellContainerClass",
-        "RAIL_WINDOW",
-        "VMwareUnityHostWndClass",
-        "Citrix",
-    ];
-
-    public static bool IsRemote(ForegroundTarget target) =>
-        RemoteProcessMarkers.Any(marker =>
-            target.ProcessName.Contains(marker, StringComparison.OrdinalIgnoreCase)) ||
-        RemoteClassMarkers.Any(marker =>
-            target.WindowClass.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    public static bool IsNativeEmacs(ForegroundTarget target) =>
+        string.Equals(
+            target.ProcessName,
+            "emacs",
+            StringComparison.OrdinalIgnoreCase);
 }
 
 internal static class TextInputPlanner
@@ -321,6 +314,12 @@ internal enum VirtualKey : ushort
     Enter = 0x0D,
 }
 
+internal enum ClipboardInsertionShortcut
+{
+    StandardPaste,
+    EmacsYank,
+}
+
 internal interface IClipboardBackend
 {
     uint GetSequenceNumber();
@@ -336,7 +335,7 @@ internal sealed record ClipboardSnapshot(object? Data);
 
 internal interface IKeyboardInjector
 {
-    void SendPaste();
+    void SendClipboardInsert(ClipboardInsertionShortcut shortcut);
 
     void SendUnicode(string text);
 
