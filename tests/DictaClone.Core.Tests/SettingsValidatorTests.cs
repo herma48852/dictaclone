@@ -25,6 +25,12 @@ public sealed class SettingsValidatorTests
         Assert.False(settings.Preferences.StartWithWindows);
         Assert.False(settings.Preferences.HistoryEnabled);
         Assert.Equal(100, settings.Preferences.HistoryLimit);
+        Assert.False(settings.SmartEdit.Enabled);
+        Assert.Equal(SmartEditProviderKind.OpenAIResponses,
+            settings.SmartEdit.Provider);
+        Assert.StartsWith("https://", settings.SmartEdit.Endpoint);
+        Assert.False(settings.Hotkeys.Single(binding =>
+            binding.Action == HotkeyAction.SmartEdit).Enabled);
     }
 
     [Fact]
@@ -253,5 +259,27 @@ public sealed class SettingsValidatorTests
             errors,
             error => error.Path == "Preferences.HistoryLimit" &&
                 error.Code == "range");
+    }
+
+    [Fact]
+    public void SmartEdit_RequiresBoundedHttpsConfiguration()
+    {
+        DictaCloneSettings settings = DictaCloneSettings.Default with
+        {
+            SmartEdit = new SmartEditSettings(
+                Enabled: true,
+                Provider: (SmartEditProviderKind)999,
+                Endpoint: "http://insecure.example.test/responses",
+                Model: string.Empty,
+                RequestTimeout: TimeSpan.FromSeconds(2),
+                MaximumRetries: 4,
+                CustomInstructions: new string('x', 4_097)),
+        };
+
+        var errors = SettingsValidator.Validate(settings);
+
+        Assert.Equal(6, errors.Count(error => error.Path.StartsWith(
+            "SmartEdit",
+            StringComparison.Ordinal)));
     }
 }

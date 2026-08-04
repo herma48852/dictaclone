@@ -17,6 +17,14 @@ public sealed class LiveDictationControllerTests
         HotkeyAction.Dictation,
         HotkeyEventKind.Released,
         IsInjected: false);
+    private static readonly HotkeyEvent SmartPress = new(
+        HotkeyAction.SmartEdit,
+        HotkeyEventKind.Pressed,
+        IsInjected: false);
+    private static readonly HotkeyEvent SmartRelease = SmartPress with
+    {
+        Kind = HotkeyEventKind.Released,
+    };
 
     [Fact]
     public async Task HoldDictation_CapturesTranscribesCleansAndDisplaysText()
@@ -402,6 +410,149 @@ public sealed class LiveDictationControllerTests
         await controller.CancelAsync();
     }
 
+    [Fact]
+    public async Task SmartEdit_DisabledByDefaultDoesNotOpenMicrophone()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var audio = new FakeCaptureService(session);
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            audio,
+            new FakeTranscriptionEngine("unused"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(SmartPress);
+
+        Assert.Equal(0, audio.CallCount);
+        Assert.Contains("Smart Edit is off", overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task SmartEdit_CapturesCallsRevalidatesAndReplacesSelection()
+    {
+        var selection = new FakeSelectedTextService(
+            new SelectedTextSnapshot("wordy original", "fingerprint"));
+        var provider = new FakeSmartEditProvider("concise replacement");
+        var insertion = new FakeTextInsertionService();
+        var foreground = new FakeForegroundTargetService();
+        var settings = DictaCloneSettings.Default with
+        {
+            SmartEdit = DictaCloneSettings.Default.SmartEdit with
+            {
+                Enabled = true,
+            },
+        };
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(new FakeCaptureSession(CreateSpeechAudio())),
+            new FakeTranscriptionEngine("make this concise"),
+            new FakeTextProcessor(text => text),
+            foreground,
+            insertion,
+            new FakeOverlay(),
+            settings,
+            smartEdit: provider,
+            selectedText: selection);
+
+        await controller.HandleAsync(SmartPress);
+        await controller.HandleAsync(SmartRelease);
+
+        Assert.Equal("concise replacement", insertion.Text);
+        Assert.Equal("concise replacement", controller.LastTranscript);
+        Assert.Equal(1, selection.CaptureCount);
+        Assert.Equal(1, selection.RevalidationCount);
+        Assert.NotNull(provider.Request);
+        Assert.Equal("make this concise", provider.Request.Instruction);
+        Assert.Equal("wordy original", provider.Request.SelectedText);
+        Assert.Equal(foreground.Target.ProcessName, provider.Request.ProcessName);
+    }
+
+    [Fact]
+    public async Task SmartEdit_ChangedSelectionKeepsResultForCopyWithoutInsertion()
+    {
+        var selection = new FakeSelectedTextService(
+            new SelectedTextSnapshot("original", "fingerprint"))
+        {
+            IsCurrent = false,
+        };
+        var insertion = new FakeTextInsertionService();
+        var overlay = new FakeOverlay();
+        var settings = DictaCloneSettings.Default with
+        {
+            SmartEdit = DictaCloneSettings.Default.SmartEdit with
+            {
+                Enabled = true,
+            },
+        };
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(new FakeCaptureSession(CreateSpeechAudio())),
+            new FakeTranscriptionEngine("rewrite"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            insertion,
+            overlay,
+            settings,
+            smartEdit: new FakeSmartEditProvider("recoverable result"),
+            selectedText: selection);
+
+        await controller.HandleAsync(SmartPress);
+        await controller.HandleAsync(SmartRelease);
+
+        Assert.Null(insertion.Text);
+        Assert.Equal("recoverable result", controller.LastTranscript);
+        Assert.Contains("Selection changed", overlay.Messages[^1]);
+        Assert.Contains("Copy last result", overlay.Messages[^1]);
+    }
+
+    [Theory]
+    [InlineData(typeof(SmartEditAuthenticationException), "API key was rejected")]
+    [InlineData(typeof(SmartEditRateLimitException), "rate limit")]
+    [InlineData(typeof(SmartEditTimeoutException), "timed out")]
+    [InlineData(typeof(SmartEditUnavailableException), "unavailable")]
+    [InlineData(typeof(SmartEditResponseException), "invalid response")]
+    public async Task SmartEdit_ProviderFailuresAreActionable(
+        Type exceptionType,
+        string expectedMessage)
+    {
+        Exception exception = exceptionType ==
+            typeof(SmartEditAuthenticationException)
+                ? new SmartEditAuthenticationException()
+                : exceptionType == typeof(SmartEditRateLimitException)
+                    ? new SmartEditRateLimitException()
+                    : exceptionType == typeof(SmartEditTimeoutException)
+                        ? new SmartEditTimeoutException()
+                        : exceptionType == typeof(SmartEditUnavailableException)
+                            ? new SmartEditUnavailableException()
+                            : new SmartEditResponseException();
+        var overlay = new FakeOverlay();
+        var settings = DictaCloneSettings.Default with
+        {
+            SmartEdit = DictaCloneSettings.Default.SmartEdit with
+            {
+                Enabled = true,
+            },
+        };
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(new FakeCaptureSession(CreateSpeechAudio())),
+            new FakeTranscriptionEngine("rewrite"),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
+            overlay,
+            settings,
+            smartEdit: new FakeSmartEditProvider(exception),
+            selectedText: new FakeSelectedTextService(null));
+
+        await controller.HandleAsync(SmartPress);
+        await controller.HandleAsync(SmartRelease);
+
+        Assert.Contains(expectedMessage, overlay.Messages[^1],
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static LiveDictationController CreateController(
         FakeCaptureSession session,
         FakeOverlay overlay) =>
@@ -632,6 +783,56 @@ public sealed class LiveDictationControllerTests
         {
             Started.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
+    private sealed class FakeSmartEditProvider : ISmartEditProvider
+    {
+        private readonly string? _result;
+        private readonly Exception? _exception;
+
+        public FakeSmartEditProvider(string result) => _result = result;
+
+        public FakeSmartEditProvider(Exception exception) =>
+            _exception = exception;
+
+        public SmartEditRequest? Request { get; private set; }
+
+        public Task<string> EditAsync(
+            SmartEditRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return _exception is null
+                ? Task.FromResult(_result!)
+                : Task.FromException<string>(_exception);
+        }
+    }
+
+    private sealed class FakeSelectedTextService(SelectedTextSnapshot? snapshot)
+        : ISelectedTextService
+    {
+        public bool IsCurrent { get; set; } = true;
+
+        public int CaptureCount { get; private set; }
+
+        public int RevalidationCount { get; private set; }
+
+        public Task<SelectedTextSnapshot?> CaptureAsync(
+            ForegroundTarget target,
+            CancellationToken cancellationToken)
+        {
+            CaptureCount++;
+            return Task.FromResult(snapshot);
+        }
+
+        public Task<bool> RevalidateAsync(
+            SelectedTextSnapshot original,
+            ForegroundTarget target,
+            CancellationToken cancellationToken)
+        {
+            RevalidationCount++;
+            return Task.FromResult(IsCurrent);
         }
     }
 }

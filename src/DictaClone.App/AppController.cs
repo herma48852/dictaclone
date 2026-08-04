@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using DictaClone.App.Presentation;
 using DictaClone.Audio;
@@ -30,11 +31,14 @@ public sealed class AppController : IAsyncDisposable
     private readonly PrivacySafeDiagnosticLog _diagnostics;
     private readonly PrivacySafeSupportBundleService _supportBundles;
     private readonly StartupRegistrationService _startupRegistration;
+    private readonly WindowsCredentialSecretStore _secretStore;
+    private readonly HttpClient _smartEditHttpClient;
     private readonly SemaphoreSlim _settingsApplyGate = new(1, 1);
     private ImmutableArray<HotkeyBinding> _bindings;
     private DictaCloneSettings _settings;
     private SettingsWindow? _settingsWindow;
     private HistoryWindow? _historyWindow;
+    private bool _smartEditCredentialStored;
     private readonly bool _enableModelWarmup;
     private readonly bool _enablePersistentState;
     private readonly bool _enableFirstRunUi;
@@ -61,6 +65,11 @@ public sealed class AppController : IAsyncDisposable
         var modelManager = new WhisperModelManager(
             WhisperModelStorage.ResolveDefaultDirectory());
         _transcription = new(modelManager, ownsModelManager: true);
+        _secretStore = new();
+        _smartEditHttpClient = new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+        });
         _dictationUi = new(
             new WasapiAudioCaptureService(),
             _transcription,
@@ -69,7 +78,11 @@ public sealed class AppController : IAsyncDisposable
             new TextInsertionService(),
             _overlay,
             _settings,
-            PostToUi);
+            PostToUi,
+            new OpenAiResponsesSmartEditProvider(
+                _smartEditHttpClient,
+                _secretStore),
+            new SelectedTextService());
         _trayIcon = new();
         DictaCloneDataPaths paths = DictaCloneDataPaths.Default;
         _settingsStore = new(paths);
@@ -107,6 +120,36 @@ public sealed class AppController : IAsyncDisposable
                     ? DiagnosticOutcome.Succeeded
                     : DiagnosticOutcome.Recovered,
                 cancellationToken: cancellationToken).ConfigureAwait(true);
+        }
+
+        try
+        {
+            _smartEditCredentialStored = !string.IsNullOrWhiteSpace(
+                await _secretStore.ReadAsync(
+                    OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                    cancellationToken).ConfigureAwait(true));
+        }
+        catch (Exception exception)
+        {
+            _smartEditCredentialStored = false;
+            await WriteDiagnosticSafeAsync(
+                DiagnosticEventKind.SettingsLoad,
+                DiagnosticOutcome.Failed,
+                exception: exception,
+                cancellationToken: cancellationToken).ConfigureAwait(true);
+        }
+
+        if (_settings.SmartEdit.Enabled && !_smartEditCredentialStored)
+        {
+            _settings = DisableSmartEdit(_settings);
+            _bindings = _settings.Hotkeys;
+            await _dictationUi.UpdateSettingsAsync(_settings)
+                .ConfigureAwait(true);
+            if (_enablePersistentState)
+            {
+                await _settingsStore.SaveAsync(_settings, cancellationToken)
+                    .ConfigureAwait(true);
+            }
         }
 
         if (_enableSystemIntegration)
@@ -232,6 +275,7 @@ public sealed class AppController : IAsyncDisposable
                 _historyStore.Dispose();
                 _settingsStore.Dispose();
                 _diagnostics.Dispose();
+                _smartEditHttpClient.Dispose();
                 _settingsApplyGate.Dispose();
             }
         }
@@ -462,12 +506,16 @@ public sealed class AppController : IAsyncDisposable
                 _settings.Insertion,
                 _settings.Text,
                 _settings.Preferences,
-                firstRun: !_settings.Preferences.FirstRunCompleted);
+                firstRun: !_settings.Preferences.FirstRunCompleted,
+                _settings.SmartEdit,
+                _smartEditCredentialStored);
             _settingsWindow.BindingsChanged += BindingsChanged;
             _settingsWindow.AudioSpeechSettingsChanged +=
                 AudioSpeechSettingsChanged;
             _settingsWindow.TextSettingsChanged += TextSettingsChanged;
             _settingsWindow.PreferencesChanged += PreferencesChanged;
+            _settingsWindow.SmartEditSettingsChanged +=
+                SmartEditSettingsChanged;
             _settingsWindow.SettingsImportRequested += SettingsImportRequested;
             _settingsWindow.SettingsExportRequested += SettingsExportRequested;
             _settingsWindow.SupportBundleRequested += SupportBundleRequested;
@@ -584,6 +632,116 @@ public sealed class AppController : IAsyncDisposable
         }
     }
 
+    private async void SmartEditSettingsChanged(
+        object? sender,
+        SmartEditSettingsChangedEventArgs eventArgs)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        string? priorSecret = null;
+        bool credentialChanged = eventArgs.DeleteCredential ||
+            eventArgs.ApiKey is not null;
+        try
+        {
+            if (credentialChanged)
+            {
+                priorSecret = await _secretStore.ReadAsync(
+                    OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                    CancellationToken.None);
+                if (eventArgs.DeleteCredential)
+                {
+                    await _secretStore.DeleteAsync(
+                        OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                        CancellationToken.None);
+                }
+                else
+                {
+                    await _secretStore.WriteAsync(
+                        OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                        eventArgs.ApiKey!,
+                        CancellationToken.None);
+                }
+            }
+
+            ImmutableArray<HotkeyBinding> hotkeys =
+            [
+                .. _settings.Hotkeys.Select(binding =>
+                    binding.Action == HotkeyAction.SmartEdit
+                        ? binding with { Enabled = eventArgs.Settings.Enabled }
+                        : binding),
+            ];
+            bool applied = await ApplySettingsAsync(
+                _settings with
+                {
+                    SmartEdit = eventArgs.Settings,
+                    Hotkeys = hotkeys,
+                },
+                "âœ“  Smart Edit settings saved");
+            if (!applied && credentialChanged)
+            {
+                await RestoreSmartEditSecretAsync(priorSecret);
+                return;
+            }
+
+            if (applied)
+            {
+                _smartEditCredentialStored =
+                    !eventArgs.DeleteCredential &&
+                    (eventArgs.ApiKey is not null || priorSecret is not null ||
+                        _smartEditCredentialStored);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (credentialChanged)
+            {
+                try
+                {
+                    await RestoreSmartEditSecretAsync(priorSecret);
+                }
+                catch (Exception)
+                {
+                    // The settings remain disabled or unchanged; the user can
+                    // remove the credential explicitly and retry.
+                }
+            }
+
+            await WriteDiagnosticSafeAsync(
+                DiagnosticEventKind.SettingsSave,
+                DiagnosticOutcome.Failed,
+                exception: exception);
+            _overlay.ShowStatus(
+                OverlayStatus.Failure,
+                "Smart Edit API key could not be saved in Windows Credential Manager");
+        }
+    }
+
+    private Task RestoreSmartEditSecretAsync(string? priorSecret) =>
+        priorSecret is null
+            ? _secretStore.DeleteAsync(
+                OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                CancellationToken.None)
+            : _secretStore.WriteAsync(
+                OpenAiResponsesSmartEditProvider.ApiKeySecretName,
+                priorSecret,
+                CancellationToken.None);
+
+    private static DictaCloneSettings DisableSmartEdit(
+        DictaCloneSettings settings) => settings with
+        {
+            SmartEdit = settings.SmartEdit with { Enabled = false },
+            Hotkeys =
+            [
+                .. settings.Hotkeys.Select(binding =>
+                    binding.Action == HotkeyAction.SmartEdit
+                        ? binding with { Enabled = false }
+                        : binding),
+            ],
+        };
+
     private async void SettingsImportRequested(
         object? sender,
         SettingsTransferRequestedEventArgs eventArgs)
@@ -593,6 +751,13 @@ public sealed class AppController : IAsyncDisposable
             DictaCloneSettings imported = await _settingsTransfer.ImportAsync(
                 eventArgs.Path,
                 CancellationToken.None);
+            if (imported.SmartEdit.Enabled && !_smartEditCredentialStored)
+            {
+                imported = DisableSmartEdit(imported);
+                _trayIcon.ShowNotification(
+                    "Smart Edit stayed off",
+                    "Imported settings never include API keys. Store a key in Smart Edit settings to enable it.");
+            }
             bool applied = await ApplySettingsAsync(
                 imported,
                 "✓  Settings imported");

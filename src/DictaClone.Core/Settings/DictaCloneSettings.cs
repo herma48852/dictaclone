@@ -10,9 +10,10 @@ public sealed record DictaCloneSettings(
     TextProcessingSettings Text,
     InsertionSettings Insertion,
     ImmutableArray<HotkeyBinding> Hotkeys,
-    ApplicationPreferences Preferences)
+    ApplicationPreferences Preferences,
+    SmartEditSettings SmartEdit)
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public static DictaCloneSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -29,7 +30,15 @@ public sealed record DictaCloneSettings(
             FirstRunCompleted: false,
             StartWithWindows: false,
             HistoryEnabled: false,
-            HistoryLimit: 100));
+            HistoryLimit: 100),
+        new SmartEditSettings(
+            Enabled: false,
+            Provider: SmartEditProviderKind.OpenAIResponses,
+            Endpoint: "https://api.openai.com/v1/responses",
+            Model: "gpt-5.6-sol",
+            RequestTimeout: TimeSpan.FromSeconds(30),
+            MaximumRetries: 1,
+            CustomInstructions: null));
 }
 
 public sealed record AudioSettings(
@@ -76,3 +85,17 @@ public sealed record ApplicationPreferences(
     bool StartWithWindows,
     bool HistoryEnabled,
     int HistoryLimit);
+
+public sealed record SmartEditSettings(
+    bool Enabled,
+    SmartEditProviderKind Provider,
+    string Endpoint,
+    string Model,
+    TimeSpan RequestTimeout,
+    int MaximumRetries,
+    string? CustomInstructions);
+
+public enum SmartEditProviderKind
+{
+    OpenAIResponses,
+}

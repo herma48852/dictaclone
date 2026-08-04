@@ -79,6 +79,18 @@ public static class SettingsValidator
             ValidatePreferences(settings.Preferences, errors);
         }
 
+        if (settings.SmartEdit is null)
+        {
+            errors.Add(new(
+                "SmartEdit",
+                "required",
+                "Smart Edit settings are required."));
+        }
+        else
+        {
+            ValidateSmartEdit(settings.SmartEdit, errors);
+        }
+
         return errors.ToImmutable();
     }
 
@@ -245,6 +257,61 @@ public static class SettingsValidator
                 "Preferences.HistoryLimit",
                 "range",
                 "History limit must be between 1 and 500 entries."));
+        }
+    }
+
+    private static void ValidateSmartEdit(
+        SmartEditSettings settings,
+        ImmutableArray<SettingsValidationError>.Builder errors)
+    {
+        if (!Enum.IsDefined(settings.Provider))
+        {
+            errors.Add(new(
+                "SmartEdit.Provider",
+                "invalid",
+                "Smart Edit provider must be recognized."));
+        }
+
+        if (!Uri.TryCreate(settings.Endpoint, UriKind.Absolute, out Uri? endpoint) ||
+            endpoint.Scheme != Uri.UriSchemeHttps)
+        {
+            errors.Add(new(
+                "SmartEdit.Endpoint",
+                "invalid",
+                "Smart Edit endpoint must be an absolute HTTPS URL."));
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.Model) || settings.Model.Length > 128)
+        {
+            errors.Add(new(
+                "SmartEdit.Model",
+                "invalid",
+                "Smart Edit model must contain 1 to 128 characters."));
+        }
+
+        if (settings.RequestTimeout < TimeSpan.FromSeconds(5) ||
+            settings.RequestTimeout > TimeSpan.FromMinutes(2))
+        {
+            errors.Add(new(
+                "SmartEdit.RequestTimeout",
+                "range",
+                "Smart Edit timeout must be between 5 seconds and 2 minutes."));
+        }
+
+        if (settings.MaximumRetries is < 0 or > 3)
+        {
+            errors.Add(new(
+                "SmartEdit.MaximumRetries",
+                "range",
+                "Smart Edit retries must be between 0 and 3."));
+        }
+
+        if (settings.CustomInstructions?.Length > 4_096)
+        {
+            errors.Add(new(
+                "SmartEdit.CustomInstructions",
+                "length",
+                "Custom instructions cannot exceed 4,096 characters."));
         }
     }
 

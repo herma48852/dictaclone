@@ -6,6 +6,7 @@ namespace DictaClone.EndToEndTests;
 public sealed class AppProcessLifecycleTests
 {
     [Fact]
+    [Trait("Category", "DesktopE2E")]
     public async Task RepositoryRuntime_StartsAndStopsTrayProcess()
     {
         string repositoryRoot = FindRepositoryRoot();
@@ -48,6 +49,7 @@ public sealed class AppProcessLifecycleTests
     }
 
     [Fact]
+    [Trait("Category", "DesktopE2E")]
     public void DuplicateSmokeInstance_ExitsWithoutOpeningADialog()
     {
         Assert.True(SingleInstanceGuard.TryAcquire(

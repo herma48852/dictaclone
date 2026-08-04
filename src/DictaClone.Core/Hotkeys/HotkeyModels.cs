@@ -223,9 +223,10 @@ public static class HotkeyDefaults
         new(
             HotkeyAction.SmartEdit,
             new HotkeyChord(
-                HotkeyModifiers.Control |
-                HotkeyModifiers.Shift |
-                HotkeyModifiers.Windows)),
+                HotkeyModifiers.Alt |
+                HotkeyModifiers.Shift,
+                HotkeyKey.Space),
+            Enabled: false),
         new(
             HotkeyAction.TypingMode,
             new HotkeyChord(

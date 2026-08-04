@@ -8,9 +8,11 @@ using DictaClone.Core.Contracts;
 using DictaClone.Core.Hotkeys;
 using DictaClone.Core.Settings;
 using WpfButton = System.Windows.Controls.Button;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfLabel = System.Windows.Controls.Label;
 using WpfListBox = System.Windows.Controls.ListBox;
+using WpfPasswordBox = System.Windows.Controls.PasswordBox;
 using WpfTabControl = System.Windows.Controls.TabControl;
 
 namespace DictaClone.App.Tests;
@@ -132,7 +134,7 @@ public sealed class WindowConfigurationTests
 
             var tabs = Assert.IsType<WpfTabControl>(window.Content);
             Assert.Equal(
-                ["General", "Knowledge", "Privacy & recovery"],
+                ["General", "Knowledge", "Smart Edit", "Privacy & recovery"],
                 tabs.Items.Cast<TabItem>()
                     .Select(tab => Assert.IsType<string>(tab.Header))
                     .ToArray());
@@ -141,6 +143,7 @@ public sealed class WindowConfigurationTests
                 AutomationProperties.GetName(tabs));
             Assert.Equal(text, window.Text);
             Assert.Equal(preferences, window.Preferences);
+            Assert.Equal(DictaCloneSettings.Default.SmartEdit, window.SmartEdit);
             Assert.Equal(2, FindLogicalChildren<WpfDataGrid>(window).Count());
             Assert.All(
                 FindLogicalChildren<WpfLabel>(window),
@@ -193,6 +196,45 @@ public sealed class WindowConfigurationTests
 
             Assert.Equal(newer, copied);
             Assert.Equal(1, clearRequests);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public async Task SmartEditTab_RequiresKeyAndRaisesExplicitConsentSettings()
+    {
+        await RunOnStaAsync(() =>
+        {
+            var window = new SettingsWindow(
+                HotkeyDefaults.Bindings,
+                smartEditSettings: DictaCloneSettings.Default.SmartEdit,
+                smartEditCredentialStored: false);
+            SmartEditSettingsChangedEventArgs? submitted = null;
+            window.SmartEditSettingsChanged +=
+                (_, eventArgs) => submitted = eventArgs;
+            WpfCheckBox enabled = Assert.Single(
+                FindLogicalChildren<WpfCheckBox>(window),
+                control => AutomationProperties.GetName(control) ==
+                    "Enable cloud Smart Edit");
+            WpfPasswordBox apiKey = Assert.Single(
+                FindLogicalChildren<WpfPasswordBox>(window),
+                control => AutomationProperties.GetName(control) ==
+                    "Smart Edit API key");
+            enabled.IsChecked = true;
+
+            FindButton(window, "Apply Smart Edit settings").RaiseEvent(
+                new RoutedEventArgs(WpfButton.ClickEvent));
+            Assert.Null(submitted);
+
+            apiKey.Password = "test-api-key";
+            FindButton(window, "Apply Smart Edit settings").RaiseEvent(
+                new RoutedEventArgs(WpfButton.ClickEvent));
+
+            Assert.NotNull(submitted);
+            Assert.True(submitted.Settings.Enabled);
+            Assert.Equal("test-api-key", submitted.ApiKey);
+            Assert.False(submitted.DeleteCredential);
+            Assert.Empty(apiKey.Password);
             window.Close();
         });
     }

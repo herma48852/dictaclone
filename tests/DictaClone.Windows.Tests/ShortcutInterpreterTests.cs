@@ -101,14 +101,21 @@ public sealed class ShortcutInterpreterTests
     public void ExactModifiers_PreventOverlappingDefaultChords()
     {
         var interpreter = new ShortcutInterpreter(
-            HotkeyDefaults.Bindings.Take(2));
+            HotkeyDefaults.Bindings.Select(binding =>
+                binding.Action == HotkeyAction.SmartEdit
+                    ? binding with { Enabled = true }
+                    : binding));
         RawInputControl shift =
             RawInputControl.ForModifier(PhysicalModifier.LeftShift);
+        RawInputControl alt =
+            RawInputControl.ForModifier(PhysicalModifier.LeftAlt);
+        RawInputControl space =
+            RawInputControl.ForPrimaryKey(HotkeyKey.Space);
 
-        Assert.Empty(interpreter.Process(new(LeftControl, IsPressed: true)));
+        Assert.Empty(interpreter.Process(new(alt, IsPressed: true)));
         Assert.Empty(interpreter.Process(new(shift, IsPressed: true)));
         HotkeyEvent smartEdit = Assert.Single(
-            interpreter.Process(new(LeftWindows, IsPressed: true)));
+            interpreter.Process(new(space, IsPressed: true)));
 
         Assert.Equal(HotkeyAction.SmartEdit, smartEdit.Action);
         Assert.Equal(HotkeyEventKind.Pressed, smartEdit.Kind);

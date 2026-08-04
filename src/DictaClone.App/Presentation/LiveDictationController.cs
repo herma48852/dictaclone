@@ -17,12 +17,15 @@ public sealed class LiveDictationController : IAsyncDisposable
     private readonly ITextProcessor _textProcessor;
     private readonly IForegroundTargetService _foregroundTarget;
     private readonly ITextInsertionService _textInsertion;
+    private readonly ISmartEditProvider _smartEdit;
+    private readonly ISelectedTextService _selectedText;
     private readonly IStatusOverlay _overlay;
     private readonly Action<Action> _postToUi;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DictaCloneSettings _settings;
     private IAudioCaptureSession? _captureSession;
     private ForegroundTarget? _capturedTarget;
+    private SelectedTextSnapshot? _capturedSelection;
     private CancellationTokenSource? _operationCancellation;
     private TaskCompletionSource? _operationCompletion;
     private HotkeyAction? _activeAction;
@@ -37,7 +40,9 @@ public sealed class LiveDictationController : IAsyncDisposable
         ITextInsertionService textInsertion,
         IStatusOverlay overlay,
         DictaCloneSettings settings,
-        Action<Action>? postToUi = null)
+        Action<Action>? postToUi = null,
+        ISmartEditProvider? smartEdit = null,
+        ISelectedTextService? selectedText = null)
     {
         _audioCapture = audioCapture ??
             throw new ArgumentNullException(nameof(audioCapture));
@@ -49,6 +54,8 @@ public sealed class LiveDictationController : IAsyncDisposable
             throw new ArgumentNullException(nameof(foregroundTarget));
         _textInsertion = textInsertion ??
             throw new ArgumentNullException(nameof(textInsertion));
+        _smartEdit = smartEdit ?? new DisabledSmartEditProvider();
+        _selectedText = selectedText ?? new NoSelectedTextService();
         _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _postToUi = postToUi ?? (action => action());
@@ -130,6 +137,7 @@ public sealed class LiveDictationController : IAsyncDisposable
             completion = _operationCompletion?.Task;
             _captureSession = null;
             _capturedTarget = null;
+            _capturedSelection = null;
             _activeAction = null;
             cancellation?.Cancel();
         }
@@ -193,17 +201,31 @@ public sealed class LiveDictationController : IAsyncDisposable
                 return;
             }
 
+            if (action == HotkeyAction.SmartEdit && !_settings.SmartEdit.Enabled)
+            {
+                Post(() => _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Smart Edit is off; configure it in Smart Edit settings"));
+                return;
+            }
+
             var cancellation = new CancellationTokenSource();
             try
             {
                 ForegroundTarget target = await _foregroundTarget
                     .CaptureAsync(cancellation.Token)
                     .ConfigureAwait(false);
+                SelectedTextSnapshot? selection = action == HotkeyAction.SmartEdit
+                    ? await _selectedText
+                        .CaptureAsync(target, cancellation.Token)
+                        .ConfigureAwait(false)
+                    : null;
                 IAudioCaptureSession session = await _audioCapture
                     .StartAsync(_settings.Audio, cancellation.Token)
                     .ConfigureAwait(false);
                 _captureSession = session;
                 _capturedTarget = target;
+                _capturedSelection = selection;
                 _operationCancellation = cancellation;
                 _operationCompletion = new(
                     TaskCreationOptions.RunContinuationsAsynchronously);
@@ -231,6 +253,7 @@ public sealed class LiveDictationController : IAsyncDisposable
     {
         IAudioCaptureSession? session;
         ForegroundTarget? target;
+        SelectedTextSnapshot? selection;
         CancellationTokenSource? cancellation;
         DictaCloneSettings settings;
 
@@ -244,10 +267,12 @@ public sealed class LiveDictationController : IAsyncDisposable
 
             session = _captureSession;
             target = _capturedTarget;
+            selection = _capturedSelection;
             cancellation = _operationCancellation;
             settings = _settings;
             _captureSession = null;
             _capturedTarget = null;
+            _capturedSelection = null;
             _activeAction = null;
             _processing = true;
             UnsubscribeLevel(session);
@@ -291,7 +316,7 @@ public sealed class LiveDictationController : IAsyncDisposable
             string transcript = await _transcription
                 .TranscribeAsync(audio, transcriptionSettings, token)
                 .ConfigureAwait(false);
-            string finalText = await _textProcessor
+            string instruction = await _textProcessor
                 .ProcessAsync(
                     transcript,
                     MapMode(action),
@@ -299,12 +324,29 @@ public sealed class LiveDictationController : IAsyncDisposable
                     token)
                 .ConfigureAwait(false);
 
-            if (string.IsNullOrWhiteSpace(finalText))
+            if (string.IsNullOrWhiteSpace(instruction))
             {
                 Post(() => _overlay.ShowStatus(
                     OverlayStatus.Failure,
                     "No speech detected"));
                 return;
+            }
+
+            string finalText = instruction;
+            if (action == HotkeyAction.SmartEdit)
+            {
+                Post(() => _overlay.ShowStatus(
+                    OverlayStatus.Processing,
+                    "Applying Smart Edit securelyâ€¦"));
+                finalText = await _smartEdit.EditAsync(
+                    new SmartEditRequest(
+                        instruction,
+                        selection?.Text,
+                        target!.ProcessName,
+                        target.WindowClass,
+                        settings.Text,
+                        settings.SmartEdit),
+                    token).ConfigureAwait(false);
             }
 
             LastTranscript = finalText;
@@ -316,6 +358,14 @@ public sealed class LiveDictationController : IAsyncDisposable
             if (!targetIsCurrent)
             {
                 throw new ForegroundTargetChangedException();
+            }
+
+            if (selection is not null &&
+                !await _selectedText
+                    .RevalidateAsync(selection, target!, token)
+                    .ConfigureAwait(false))
+            {
+                throw new SelectionChangedException();
             }
 
             Post(() => _overlay.ShowStatus(
@@ -503,12 +553,28 @@ public sealed class LiveDictationController : IAsyncDisposable
                 "No focused app is available for insertion",
             ForegroundTargetChangedException =>
                 "Focus changed; text was not inserted",
+            SelectionChangedException =>
+                "Selection changed; Smart Edit result was not inserted (use Copy last result)",
             ElevatedTargetException =>
                 "Windows blocks input to elevated apps",
             ClipboardContentionException =>
                 "Clipboard is busy; text was not inserted",
             InputInjectionException =>
                 "Windows blocked text insertion",
+            SmartEditNotConfiguredException =>
+                "Smart Edit needs an API key in Smart Edit settings",
+            SmartEditAuthenticationException =>
+                "Smart Edit API key was rejected; update it in settings",
+            SmartEditRateLimitException =>
+                "Smart Edit rate limit reached; wait and try again",
+            SmartEditTimeoutException =>
+                "Smart Edit timed out; the selected text was not changed",
+            SmartEditUnavailableException =>
+                "Smart Edit provider is unavailable; check the network and endpoint",
+            SmartEditResponseException =>
+                "Smart Edit returned an invalid response; the selected text was not changed",
+            SmartEditRequestTooLargeException =>
+                "Smart Edit selection is too large; shorten it and try again",
             _ => $"Dictation failed ({exception.GetType().Name})",
         };
 
@@ -516,6 +582,27 @@ public sealed class LiveDictationController : IAsyncDisposable
         transcript.Length <= MaximumDisplayedTranscriptLength
             ? transcript
             : transcript[..(MaximumDisplayedTranscriptLength - 1)] + "…";
+}
+
+internal sealed class DisabledSmartEditProvider : ISmartEditProvider
+{
+    public Task<string> EditAsync(
+        SmartEditRequest request,
+        CancellationToken cancellationToken) =>
+        Task.FromException<string>(new SmartEditNotConfiguredException());
+}
+
+internal sealed class NoSelectedTextService : ISelectedTextService
+{
+    public Task<SelectedTextSnapshot?> CaptureAsync(
+        ForegroundTarget target,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<SelectedTextSnapshot?>(null);
+
+    public Task<bool> RevalidateAsync(
+        SelectedTextSnapshot snapshot,
+        ForegroundTarget target,
+        CancellationToken cancellationToken) => Task.FromResult(false);
 }
 
 public sealed class TranscriptionCompletedEventArgs(string transcript)

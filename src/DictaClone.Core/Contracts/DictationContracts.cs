@@ -47,6 +47,30 @@ public interface ISmartEditProvider
         CancellationToken cancellationToken);
 }
 
+public interface ISelectedTextService
+{
+    Task<SelectedTextSnapshot?> CaptureAsync(
+        ForegroundTarget target,
+        CancellationToken cancellationToken);
+
+    Task<bool> RevalidateAsync(
+        SelectedTextSnapshot snapshot,
+        ForegroundTarget target,
+        CancellationToken cancellationToken);
+}
+
+public interface ISecretStore
+{
+    Task<string?> ReadAsync(string name, CancellationToken cancellationToken);
+
+    Task WriteAsync(
+        string name,
+        string value,
+        CancellationToken cancellationToken);
+
+    Task DeleteAsync(string name, CancellationToken cancellationToken);
+}
+
 public interface IForegroundTargetService
 {
     Task<ForegroundTarget> CaptureAsync(CancellationToken cancellationToken);
@@ -80,7 +104,13 @@ public sealed record SmartEditRequest(
     string Instruction,
     string? SelectedText,
     string ProcessName,
-    string WindowClass);
+    string WindowClass,
+    TextProcessingSettings TextSettings,
+    SmartEditSettings ProviderSettings);
+
+public sealed record SelectedTextSnapshot(
+    string Text,
+    string Fingerprint);
 
 public sealed record HotkeyEvent(
     HotkeyAction Action,

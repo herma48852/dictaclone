@@ -21,6 +21,7 @@ using WpfLabel = System.Windows.Controls.Label;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfOpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using WpfOrientation = System.Windows.Controls.Orientation;
+using WpfPasswordBox = System.Windows.Controls.PasswordBox;
 using WpfSaveFileDialog = Microsoft.Win32.SaveFileDialog;
 using WpfSlider = System.Windows.Controls.Slider;
 using WpfTabControl = System.Windows.Controls.TabControl;
@@ -55,6 +56,13 @@ public sealed class SettingsWindow : Window
     private readonly WpfTextBox _historyLimit;
     private readonly TextBlock _knowledgeValidation;
     private readonly TextBlock _preferenceValidation;
+    private readonly WpfCheckBox _smartEditEnabled;
+    private readonly WpfTextBox _smartEditEndpoint;
+    private readonly WpfTextBox _smartEditModel;
+    private readonly WpfTextBox _smartEditInstructions;
+    private readonly WpfPasswordBox _smartEditApiKey;
+    private readonly TextBlock _smartEditValidation;
+    private bool _smartEditCredentialStored;
     private ShortcutRecordingSession? _recording;
     private HotkeyChord? _candidateChord;
 
@@ -66,7 +74,9 @@ public sealed class SettingsWindow : Window
         InsertionSettings? insertionSettings = null,
         TextProcessingSettings? textSettings = null,
         ApplicationPreferences? preferences = null,
-        bool firstRun = false)
+        bool firstRun = false,
+        SmartEditSettings? smartEditSettings = null,
+        bool smartEditCredentialStored = false)
     {
         ArgumentNullException.ThrowIfNull(bindings);
         _bindings = [.. bindings];
@@ -76,6 +86,8 @@ public sealed class SettingsWindow : Window
         Insertion = insertionSettings ?? DictaCloneSettings.Default.Insertion;
         Text = textSettings ?? DictaCloneSettings.Default.Text;
         Preferences = preferences ?? DictaCloneSettings.Default.Preferences;
+        SmartEdit = smartEditSettings ?? DictaCloneSettings.Default.SmartEdit;
+        _smartEditCredentialStored = smartEditCredentialStored;
         _vocabularyEntries = new(Text.Vocabulary.Select(entry =>
             new EditablePair(entry.SpokenForm, entry.WrittenForm)));
         _expansionEntries = new(Text.Expansions.Select(entry =>
@@ -353,6 +365,10 @@ public sealed class SettingsWindow : Window
             _preferenceValidation) = CreatePrivacyTab(
                 firstRun,
                 out TabItem privacyTab);
+        (_smartEditEnabled, _smartEditEndpoint, _smartEditModel,
+            _smartEditInstructions, _smartEditApiKey,
+            _smartEditValidation) = CreateSmartEditTab(
+                out TabItem smartEditTab);
         var tabs = new WpfTabControl
         {
             Margin = new(12),
@@ -367,6 +383,7 @@ public sealed class SettingsWindow : Window
             Content = root,
         });
         tabs.Items.Add(knowledgeTab);
+        tabs.Items.Add(smartEditTab);
         tabs.Items.Add(privacyTab);
         Content = tabs;
 
@@ -397,6 +414,9 @@ public sealed class SettingsWindow : Window
     public event EventHandler<PreferencesChangedEventArgs>?
         PreferencesChanged;
 
+    public event EventHandler<SmartEditSettingsChangedEventArgs>?
+        SmartEditSettingsChanged;
+
     public event EventHandler<SettingsTransferRequestedEventArgs>?
         SettingsImportRequested;
 
@@ -419,6 +439,8 @@ public sealed class SettingsWindow : Window
     public TextProcessingSettings Text { get; private set; }
 
     public ApplicationPreferences Preferences { get; private set; }
+
+    public SmartEditSettings SmartEdit { get; private set; }
 
     protected override void OnPreviewKeyDown(WpfKeyEventArgs e)
     {
@@ -705,6 +727,141 @@ public sealed class SettingsWindow : Window
         return (startWithWindows, historyEnabled, historyLimit, validation);
     }
 
+    private (
+        WpfCheckBox Enabled,
+        WpfTextBox Endpoint,
+        WpfTextBox Model,
+        WpfTextBox Instructions,
+        WpfPasswordBox ApiKey,
+        TextBlock Validation) CreateSmartEditTab(out TabItem tab)
+    {
+        var panel = new StackPanel
+        {
+            Margin = new(18),
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Smart Edit provider",
+            FontSize = 22,
+            FontWeight = FontWeights.SemiBold,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "When enabled, DictaClone sends the spoken instruction and " +
+                "the explicitly selected text to the HTTPS provider below. " +
+                "Microphone audio stays on this computer. The API key is kept " +
+                "in Windows Credential Manager and is never exported.",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new(0, 6, 0, 16),
+            Opacity = 0.78,
+        });
+
+        var enabled = new WpfCheckBox
+        {
+            Content = "Enable cloud Smart Edit and allow selected text to be sent",
+            IsChecked = SmartEdit.Enabled,
+            Margin = new(0, 4, 0, 12),
+        };
+        AutomationProperties.SetName(enabled, "Enable cloud Smart Edit");
+        panel.Children.Add(enabled);
+
+        var endpoint = CreateTextField(
+            panel,
+            "Provider HTTPS endpoint",
+            "Smart Edit provider HTTPS endpoint",
+            SmartEdit.Endpoint);
+        var model = CreateTextField(
+            panel,
+            "Provider model",
+            "Smart Edit provider model",
+            SmartEdit.Model);
+        var instructions = CreateTextField(
+            panel,
+            "Custom Smart Edit instructions (optional)",
+            "Custom Smart Edit instructions",
+            SmartEdit.CustomInstructions ?? string.Empty);
+        instructions.AcceptsReturn = true;
+        instructions.Height = 88;
+        instructions.TextWrapping = TextWrapping.Wrap;
+        instructions.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+
+        var apiKey = new WpfPasswordBox
+        {
+            Margin = new(0, 4, 0, 4),
+            MinWidth = 300,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+        };
+        AutomationProperties.SetName(apiKey, "Smart Edit API key");
+        panel.Children.Add(new WpfLabel
+        {
+            Content = "API key (leave blank to keep the stored key)",
+            Target = apiKey,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new(0),
+            Margin = new(0, 8, 0, 0),
+        });
+        panel.Children.Add(apiKey);
+        panel.Children.Add(new TextBlock
+        {
+            Text = _smartEditCredentialStored
+                ? "A Smart Edit API key is stored for this Windows account."
+                : "No Smart Edit API key is stored.",
+            Opacity = 0.72,
+            Margin = new(0, 0, 0, 12),
+        });
+
+        var buttons = new WrapPanel();
+        WpfButton apply = CreateActionButton("Apply Smart Edit settings");
+        apply.Click += (_, _) => ApplySmartEditSettings(deleteCredential: false);
+        WpfButton remove = CreateActionButton("Remove stored API key");
+        remove.Click += (_, _) => ApplySmartEditSettings(deleteCredential: true);
+        buttons.Children.Add(apply);
+        buttons.Children.Add(remove);
+        panel.Children.Add(buttons);
+
+        var validation = new TextBlock
+        {
+            Margin = new(0, 12, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        panel.Children.Add(validation);
+
+        tab = new()
+        {
+            Header = "Smart Edit",
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = panel,
+            },
+        };
+        return (enabled, endpoint, model, instructions, apiKey, validation);
+    }
+
+    private static WpfTextBox CreateTextField(
+        System.Windows.Controls.Panel panel,
+        string label,
+        string accessibleName,
+        string value)
+    {
+        var field = new WpfTextBox
+        {
+            Text = value,
+            Margin = new(0, 4, 0, 8),
+            MinWidth = 300,
+        };
+        AutomationProperties.SetName(field, accessibleName);
+        panel.Children.Add(new WpfLabel
+        {
+            Content = label,
+            Target = field,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new(0),
+        });
+        panel.Children.Add(field);
+        return field;
+    }
+
     private static WpfDataGrid CreatePairGrid(
         string accessibleName,
         string firstHeader,
@@ -873,6 +1030,52 @@ public sealed class SettingsWindow : Window
         PreferencesChanged?.Invoke(this, new(Preferences));
     }
 
+    private void ApplySmartEditSettings(bool deleteCredential)
+    {
+        bool enabled = _smartEditEnabled.IsChecked == true;
+        string apiKey = _smartEditApiKey.Password;
+        bool willHaveCredential = !deleteCredential &&
+            (_smartEditCredentialStored || !string.IsNullOrWhiteSpace(apiKey));
+        if (enabled && !willHaveCredential)
+        {
+            _smartEditValidation.Text =
+                "Enter an API key before enabling cloud Smart Edit.";
+            return;
+        }
+
+        SmartEditSettings candidate = SmartEdit with
+        {
+            Enabled = enabled && !deleteCredential,
+            Endpoint = _smartEditEndpoint.Text.Trim(),
+            Model = _smartEditModel.Text.Trim(),
+            CustomInstructions = string.IsNullOrWhiteSpace(
+                _smartEditInstructions.Text)
+                ? null
+                : _smartEditInstructions.Text.Trim(),
+        };
+        SettingsValidationError? error = SettingsValidator.Validate(
+            DictaCloneSettings.Default with { SmartEdit = candidate })
+            .FirstOrDefault(item => item.Path.StartsWith(
+                "SmartEdit",
+                StringComparison.Ordinal));
+        if (error is not null)
+        {
+            _smartEditValidation.Text = error.Message;
+            return;
+        }
+
+        SmartEdit = candidate;
+        _smartEditCredentialStored = willHaveCredential;
+        _smartEditValidation.Text = deleteCredential
+            ? "API-key removal and Smart Edit disable submitted for saving."
+            : "Smart Edit settings submitted for saving.";
+        SmartEditSettingsChanged?.Invoke(
+            this,
+            new(candidate, string.IsNullOrWhiteSpace(apiKey) ? null : apiKey,
+                deleteCredential));
+        _smartEditApiKey.Clear();
+    }
+
     private static bool TryCreatePairs(
         IEnumerable<EditablePair> source,
         out ImmutableArray<(string First, string Second)> pairs)
@@ -1008,7 +1211,7 @@ public sealed class SettingsWindow : Window
         var candidate = new HotkeyBinding(
             action,
             _candidateChord.Value,
-            Enabled: true,
+            Enabled: action != HotkeyAction.SmartEdit || SmartEdit.Enabled,
             activation);
         List<HotkeyBinding> updated =
         [
@@ -1079,7 +1282,8 @@ public sealed class SettingsWindow : Window
             .OrderBy(binding => binding.Action)
             .Select(binding =>
                 $"{binding.Action,-12}  {binding.Chord,-24}  " +
-                $"{binding.Activation}")
+                $"{binding.Activation,-8}  " +
+                $"{(binding.Enabled ? "Enabled" : "Disabled")}")
             .ToArray();
     }
 
@@ -1145,6 +1349,18 @@ public sealed class PreferencesChangedEventArgs(
     ApplicationPreferences preferences) : EventArgs
 {
     public ApplicationPreferences Preferences { get; } = preferences;
+}
+
+public sealed class SmartEditSettingsChangedEventArgs(
+    SmartEditSettings settings,
+    string? apiKey,
+    bool deleteCredential) : EventArgs
+{
+    public SmartEditSettings Settings { get; } = settings;
+
+    public string? ApiKey { get; } = apiKey;
+
+    public bool DeleteCredential { get; } = deleteCredential;
 }
 
 public sealed class SettingsTransferRequestedEventArgs(string path) : EventArgs

@@ -35,6 +35,8 @@ try {
         $Configuration,
         '--no-build',
         '--no-restore',
+        '--filter',
+        'Category!=LiveProvider&Category!=DesktopE2E',
         '-maxcpucount:1'
     )
 
@@ -57,7 +59,23 @@ try {
             -ResultsDirectory $coverageResultsDirectory `
             -AssemblyName 'DictaClone.Core' `
             -MinimumLinePercent $MinimumCoreLineCoverage
+
     }
+
+    $endToEndProject = Join-Path `
+        $script:RepositoryRoot `
+        'tests\DictaClone.EndToEndTests\DictaClone.EndToEndTests.csproj'
+    Invoke-CheckedCommand `
+        $dotNet `
+        test `
+        $endToEndProject `
+        --configuration `
+        $Configuration `
+        --no-build `
+        --no-restore `
+        --filter `
+        'Category=DesktopE2E' `
+        '-maxcpucount:1'
 }
 finally {
     Pop-Location

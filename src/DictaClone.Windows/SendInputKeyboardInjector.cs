@@ -18,6 +18,8 @@ internal sealed partial class SendInputKeyboardInjector : IKeyboardInjector
     private const ushort VirtualKeyShift = 0x10;
     private const ushort VirtualKeyV = 0x56;
     private const ushort VirtualKeyY = 0x59;
+    private const ushort VirtualKeyC = 0x43;
+    private const ushort VirtualKeyW = 0x57;
 
     internal static int InputStructureSize => Marshal.SizeOf<NativeInput>();
 
@@ -39,6 +41,13 @@ internal sealed partial class SendInputKeyboardInjector : IKeyboardInjector
             alt: false,
             useScanCodes: false);
     }
+
+    internal static void SendSelectionCopy(bool emacs) => SendVirtualKeyChord(
+        emacs ? VirtualKeyW : VirtualKeyC,
+        shift: false,
+        control: !emacs,
+        alt: emacs,
+        useScanCodes: false);
 
     public void SendUnicode(string text)
     {

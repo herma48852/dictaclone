@@ -1,8 +1,8 @@
 # DictaClone implementation plan
 
-Status: Milestones 0-4 complete and accepted; Milestone 5 is next.
+Status: Milestones 0-6 complete and accepted; Milestone 7 is next.
 
-Last reviewed: 2026-08-01
+Last reviewed: 2026-08-04
 
 ## 1. Product goal
 
@@ -420,7 +420,7 @@ Unless changed before coding, implementation will proceed with these defaults:
 
 - Windows-only, English-first, local transcription.
 - .NET 10 WPF and self-contained x64 packaging.
-- `Ctrl + Win + Space` hold-to-talk, `Alt + Win` Smart Edit, and `Ctrl + Alt + Space` Typing Mode, all configurable. The primary key prevents Windows' `Ctrl + Win + Arrow` virtual-desktop shortcuts from starting a recording.
+- `Ctrl + Win + Space` hold-to-talk, `Alt + Shift + Space` Smart Edit, and `Ctrl + Alt + Space` Typing Mode, all configurable. Each default has a primary key, preventing modifier-only triggers from interfering with Windows virtual-desktop shortcuts.
 - Clipboard Paste mode by default; Typing Mode is opt-in per use or per app.
 - No account, subscription, telemetry, or persisted audio.
 - Transcript history disabled by default.

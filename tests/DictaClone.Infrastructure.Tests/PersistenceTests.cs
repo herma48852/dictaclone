@@ -56,7 +56,7 @@ public sealed class PersistenceTests
     }
 
     [Fact]
-    public async Task Schema1_IsMigratedAndRewrittenAsSchema2()
+    public async Task Schema1_IsMigratedAndRewrittenAsSchema3()
     {
         using var directory = new TemporaryDirectory();
         var transfer = new SettingsTransferService();
@@ -77,6 +77,7 @@ public sealed class PersistenceTests
             await File.ReadAllTextAsync(seedPath))!.AsObject();
         document["schemaVersion"] = 1;
         _ = document.Remove("preferences");
+        _ = document.Remove("smartEdit");
         _ = document["text"]!.AsObject().Remove("workDomain");
         await File.WriteAllTextAsync(
             directory.Paths.SettingsFile,
@@ -97,7 +98,52 @@ public sealed class PersistenceTests
         Assert.False(loaded.Settings.Preferences.HistoryEnabled);
         string rewritten = await File.ReadAllTextAsync(
             directory.Paths.SettingsFile);
-        Assert.Contains("\"schemaVersion\": 2", rewritten);
+        Assert.Contains("\"schemaVersion\": 3", rewritten);
+        Assert.False(loaded.Settings.SmartEdit.Enabled);
+    }
+
+    [Fact]
+    public async Task Schema2_IsMigratedWithSmartEditSafelyDisabled()
+    {
+        using var directory = new TemporaryDirectory();
+        var transfer = new SettingsTransferService();
+        string seedPath = Path.Combine(directory.Root, "seed-v2.json");
+        await transfer.ExportAsync(
+            seedPath,
+            DictaCloneSettings.Default,
+            CancellationToken.None);
+        JsonObject document = JsonNode.Parse(
+            await File.ReadAllTextAsync(seedPath))!.AsObject();
+        document["schemaVersion"] = 2;
+        _ = document.Remove("smartEdit");
+        JsonArray hotkeys = document["hotkeys"]!.AsArray();
+        JsonObject smartEditBinding = hotkeys
+            .Select(node => node!.AsObject())
+            .Single(binding => binding["action"]!.GetValue<string>() ==
+                "smartEdit");
+        smartEditBinding["enabled"] = true;
+        await File.WriteAllTextAsync(
+            directory.Paths.SettingsFile,
+            document.ToJsonString());
+        using var store = new JsonSettingsStore(directory.Paths);
+
+        SettingsLoadResult loaded = await store.LoadAsync(
+            CancellationToken.None);
+
+        Assert.True(loaded.WasMigrated);
+        Assert.False(loaded.Settings.SmartEdit.Enabled);
+        Assert.False(loaded.Settings.Hotkeys.Single(binding =>
+            binding.Action == DictaClone.Core.Hotkeys.HotkeyAction.SmartEdit)
+            .Enabled);
+        Assert.Equal(
+            DictaClone.Core.Hotkeys.HotkeyDefaults.Bindings.Single(binding =>
+                binding.Action ==
+                    DictaClone.Core.Hotkeys.HotkeyAction.SmartEdit).Chord,
+            loaded.Settings.Hotkeys.Single(binding =>
+                binding.Action ==
+                    DictaClone.Core.Hotkeys.HotkeyAction.SmartEdit).Chord);
+        Assert.Contains("\"schemaVersion\": 3",
+            await File.ReadAllTextAsync(directory.Paths.SettingsFile));
     }
 
     [Fact]
@@ -323,6 +369,10 @@ public sealed class PersistenceTests
             {
                 Vocabulary = [new(transcript, secret)],
                 Expansions = [new(secret, transcript)],
+            },
+            SmartEdit = DictaCloneSettings.Default.SmartEdit with
+            {
+                CustomInstructions = secret,
             },
         };
         string bundlePath = Path.Combine(directory.Root, "support.zip");

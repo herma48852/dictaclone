@@ -22,6 +22,7 @@ internal static class SettingsDocumentCodec
         DictaCloneSettings settings = schemaVersion switch
         {
             1 => MigrateSchema1(document),
+            2 => MigrateSchema2(document),
             DictaCloneSettings.CurrentSchemaVersion =>
                 JsonSerializer.Deserialize<DictaCloneSettings>(
                     document.Span,
@@ -88,12 +89,44 @@ internal static class SettingsDocumentCodec
                 old.Text.EnableCorrections,
                 WorkDomainPreset.General),
             old.Insertion,
-            old.Hotkeys,
+            MigrateHotkeys(old.Hotkeys),
             new ApplicationPreferences(
                 FirstRunCompleted: false,
                 StartWithWindows: false,
                 HistoryEnabled: false,
-                HistoryLimit: 100));
+                HistoryLimit: 100),
+            DictaCloneSettings.Default.SmartEdit);
+    }
+
+    private static DictaCloneSettings MigrateSchema2(
+        ReadOnlyMemory<byte> document)
+    {
+        Schema2Settings old =
+            JsonSerializer.Deserialize<Schema2Settings>(
+                document.Span,
+                CompactOptions) ?? throw new InvalidDataException(
+                "The schema v2 settings document is empty.");
+
+        return new(
+            DictaCloneSettings.CurrentSchemaVersion,
+            old.Audio,
+            old.Transcription,
+            old.Text,
+            old.Insertion,
+            MigrateHotkeys(old.Hotkeys),
+            old.Preferences,
+            DictaCloneSettings.Default.SmartEdit);
+    }
+
+    private static ImmutableArray<HotkeyBinding> MigrateHotkeys(
+        ImmutableArray<HotkeyBinding> bindings)
+    {
+        HotkeyBinding safeSmartEditDefault = HotkeyDefaults.Bindings.Single(
+            binding => binding.Action == HotkeyAction.SmartEdit);
+        return bindings.Select(binding =>
+            binding.Action == HotkeyAction.SmartEdit
+                ? safeSmartEditDefault
+                : binding).ToImmutableArray();
     }
 
     private static JsonSerializerOptions CreateOptions(bool writeIndented)
@@ -126,4 +159,13 @@ internal static class SettingsDocumentCodec
         ImmutableArray<VocabularyEntry> Vocabulary,
         ImmutableArray<TextExpansion> Expansions,
         bool EnableCorrections);
+
+    private sealed record Schema2Settings(
+        int SchemaVersion,
+        AudioSettings Audio,
+        TranscriptionSettings Transcription,
+        TextProcessingSettings Text,
+        InsertionSettings Insertion,
+        ImmutableArray<HotkeyBinding> Hotkeys,
+        ApplicationPreferences Preferences);
 }

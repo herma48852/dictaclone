@@ -12,6 +12,7 @@ namespace DictaClone.EndToEndTests;
 public sealed partial class InsertionEndToEndTests
 {
     [Fact]
+    [Trait("Category", "DesktopE2E")]
     public async Task TestTarget_AcceptsPasteAndTypingUnicodeCorpus()
     {
         await using TestTargetClient target = await TestTargetClient.StartAsync();

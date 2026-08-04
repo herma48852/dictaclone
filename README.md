@@ -11,7 +11,7 @@ remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Milestones 0 through 5 are implemented and accepted. The tray app captures the
+Milestones 0 through 6 are implemented and accepted. The tray app captures the
 microphone, transcribes locally, and inserts into the original foreground target
 through sequence-safe Paste Mode or normally clipboard-free Typing Mode. Native
 GNU Emacs uses a clipboard-preserving `Ctrl+Y` compatibility path because its
@@ -19,7 +19,10 @@ standard key map does not paste with `Ctrl+V` and did not accept DictaClone's
 synthetic character stream. Milestone 5 persistence, recovery, knowledge,
 diagnostics, and desktop polish is accepted. Its 229 automated Release cases
 pass with 93.88% Core line coverage. Milestone 6 Smart Edit and selected-text
-editing is next.
+editing is accepted. Its cloud path is off by default, keeps provider keys in
+Windows Credential Manager, and revalidates the foreground target and exact
+selection before replacement. Milestone 7 packaging and release qualification
+is next.
 
 The default dictation trigger is `Ctrl+Win+Space`; the primary key prevents
 Windows' `Ctrl+Win+Arrow` virtual-desktop shortcuts from starting a recording.
@@ -48,6 +51,9 @@ scope, test gates, and current implementation progress.
 
 See the [Milestone 5 status](docs/MILESTONE_5_STATUS.md) for persistence,
 knowledge, recovery, diagnostics, and desktop-polish progress.
+
+See the [Milestone 6 status](docs/MILESTONE_6_STATUS.md) for Smart Edit privacy,
+provider, selected-text safety, automated evidence, and manual-review steps.
 
 See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
 cross-platform boundaries and native macOS replacements.
@@ -105,6 +111,18 @@ target with:
 .\scripts\Invoke-Milestone4Regression.ps1 -NoBuild
 .\scripts\Invoke-Milestone4ManualTest.ps1 -Target TestTarget -NoBuild
 ```
+
+Run the offline Milestone 6 regression and launch its Smart Edit manual review
+with:
+
+```powershell
+.\scripts\Invoke-Milestone6Regression.ps1 -NoBuild
+.\scripts\Invoke-Milestone6ManualTest.ps1 -NoBuild
+```
+
+The optional live-provider contract test is excluded from every normal test
+command. It runs only when an API key is present and the caller supplies the
+script's explicit paid-call switch.
 
 Speech models, the local SDK, NuGet caches, and generated benchmark output are
 excluded from Git.
