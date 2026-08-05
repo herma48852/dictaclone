@@ -32,6 +32,33 @@ public sealed class TextInsertionServiceTests
     }
 
     [Fact]
+    [Trait("Category", "ReleaseStress")]
+    public async Task FiftyConsecutivePasteTransactions_RestoreOwnedClipboard()
+    {
+        var context = new TestContext();
+        context.Clipboard.Value = "release clipboard sentinel";
+
+        for (int cycle = 0; cycle < 50; cycle++)
+        {
+            await context.Service.InsertAsync(
+                $"release cycle {cycle + 1:D2}",
+                LocalTarget,
+                new(TextInsertionMode.Paste, TimeSpan.Zero),
+                CancellationToken.None);
+
+            Assert.Equal(
+                "release clipboard sentinel",
+                context.Clipboard.Value);
+        }
+
+        Assert.Equal(50, context.Clipboard.CaptureCalls);
+        Assert.Equal(50, context.Clipboard.SetTextCalls);
+        Assert.Equal(50, context.Clipboard.RestoreCalls);
+        Assert.Equal(50, context.Keyboard.Events.Count);
+        Assert.Equal(50, context.StaThreads.CallCount);
+    }
+
+    [Fact]
     public async Task Paste_DoesNotOverwriteConcurrentClipboardChange()
     {
         var context = new TestContext();
@@ -46,6 +73,26 @@ public sealed class TextInsertionServiceTests
             CancellationToken.None);
 
         Assert.Equal("target update", context.Clipboard.Value);
+        Assert.Equal(0, context.Clipboard.RestoreCalls);
+    }
+
+    [Fact]
+    public async Task Paste_AbortsIfClipboardChangesDuringReadyWindow()
+    {
+        var context = new TestContext();
+        context.Clipboard.Value = "original";
+        context.Delay.OnBlockingWait = () =>
+            context.Clipboard.ChangeExternally("other application");
+
+        await Assert.ThrowsAsync<ClipboardContentionException>(() =>
+            context.Service.InsertAsync(
+                "dictated",
+                LocalTarget,
+                new(TextInsertionMode.Paste, TimeSpan.Zero),
+                CancellationToken.None));
+
+        Assert.Empty(context.Keyboard.Events);
+        Assert.Equal("other application", context.Clipboard.Value);
         Assert.Equal(0, context.Clipboard.RestoreCalls);
     }
 
@@ -89,7 +136,7 @@ public sealed class TextInsertionServiceTests
             CancellationToken.None);
 
         Assert.Equal(3, context.Clipboard.CaptureCalls);
-        Assert.Equal(3, context.Delay.BlockingWaits.Count);
+        Assert.Equal(4, context.Delay.BlockingWaits.Count);
         Assert.Equal(1, context.Clipboard.RestoreCalls);
     }
 
@@ -279,6 +326,7 @@ public sealed class TextInsertionServiceTests
                 Delay,
                 clipboardAttempts,
                 clipboardRetryDelay: TimeSpan.FromMilliseconds(1),
+                clipboardReadyDelay: TimeSpan.FromMilliseconds(1),
                 clipboardRestoreDelay:
                     clipboardRestoreDelay ?? TimeSpan.FromMilliseconds(1));
         }

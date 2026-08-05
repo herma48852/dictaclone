@@ -202,10 +202,13 @@ internal sealed partial class WindowsSelectionClipboard : ISelectionClipboard
         IDataObject? source = Clipboard.GetDataObject();
         if (source is null)
         {
+            ClipboardNativeFormatGuard.EnsureCaptureConsistent(
+                capturedFormatCount: 0);
             return new(null);
         }
 
         var copy = new DataObject();
+        int capturedFormatCount = 0;
         foreach (string format in source.GetFormats(autoConvert: false))
         {
             object? value = source.GetData(format, autoConvert: false);
@@ -215,9 +218,12 @@ internal sealed partial class WindowsSelectionClipboard : ISelectionClipboard
                     format,
                     autoConvert: false,
                     CloneClipboardValue(value));
+                capturedFormatCount++;
             }
         }
 
+        ClipboardNativeFormatGuard.EnsureCaptureConsistent(
+            capturedFormatCount);
         return new(copy);
     }
 
@@ -241,7 +247,12 @@ internal sealed partial class WindowsSelectionClipboard : ISelectionClipboard
     {
         if (snapshot.Data is IDataObject data)
         {
+            int expectedFormatCount = data
+                .GetFormats(autoConvert: false)
+                .Length;
             Clipboard.SetDataObject(data, copy: true);
+            ClipboardNativeFormatGuard.EnsureRestoreConsistent(
+                expectedFormatCount);
         }
         else
         {

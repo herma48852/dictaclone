@@ -157,18 +157,18 @@
       "dictaclone.app": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Audio": "[1.0.0, )",
-          "DictaClone.Core": "[1.0.0, )",
-          "DictaClone.Infrastructure": "[1.0.0, )",
-          "DictaClone.Speech": "[1.0.0, )",
-          "DictaClone.Text": "[1.0.0, )",
-          "DictaClone.Windows": "[1.0.0, )"
+          "DictaClone.Audio": "[0.1.0, )",
+          "DictaClone.Core": "[0.1.0, )",
+          "DictaClone.Infrastructure": "[0.1.0, )",
+          "DictaClone.Speech": "[0.1.0, )",
+          "DictaClone.Text": "[0.1.0, )",
+          "DictaClone.Windows": "[0.1.0, )"
         }
       },
       "dictaclone.audio": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )",
+          "DictaClone.Core": "[0.1.0, )",
           "NAudio": "[2.3.0, )"
         }
       },
@@ -178,13 +178,13 @@
       "dictaclone.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )"
+          "DictaClone.Core": "[0.1.0, )"
         }
       },
       "dictaclone.speech": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )",
+          "DictaClone.Core": "[0.1.0, )",
           "Whisper.net": "[1.9.1, )",
           "Whisper.net.Runtime": "[1.9.1, )"
         }
@@ -192,13 +192,13 @@
       "dictaclone.text": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )"
+          "DictaClone.Core": "[0.1.0, )"
         }
       },
       "dictaclone.windows": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )"
+          "DictaClone.Core": "[0.1.0, )"
         }
       },
       "NAudio": {

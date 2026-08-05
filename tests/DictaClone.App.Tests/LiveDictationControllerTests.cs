@@ -72,6 +72,41 @@ public sealed class LiveDictationControllerTests
     }
 
     [Fact]
+    [Trait("Category", "ReleaseStress")]
+    public async Task HundredSequentialDictations_CompleteWithoutLeakingCaptureState()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var capture = new FakeCaptureService(session);
+        var transcription = new FakeTranscriptionEngine("release cycle");
+        var foreground = new FakeForegroundTargetService();
+        var insertion = new FakeTextInsertionService();
+        await using var controller = new LiveDictationController(
+            capture,
+            transcription,
+            new FakeTextProcessor(text => text),
+            foreground,
+            insertion,
+            new FakeOverlay(),
+            DictaCloneSettings.Default);
+
+        for (int cycle = 0; cycle < 100; cycle++)
+        {
+            await controller.HandleAsync(Press);
+            await controller.HandleAsync(Release);
+        }
+
+        Assert.Equal(100, capture.CallCount);
+        Assert.Equal(100, transcription.CallCount);
+        Assert.Equal(100, foreground.CaptureCount);
+        Assert.Equal(100, foreground.ValidationCount);
+        Assert.Equal(100, insertion.CallCount);
+        Assert.Equal(100, session.StopCount);
+        Assert.Equal(100, session.DisposeCount);
+        Assert.Equal(0, session.LevelSubscriberCount);
+        Assert.Equal("release cycle", controller.LastTranscript);
+    }
+
+    [Fact]
     public async Task SilentCapture_DoesNotInvokeTranscription()
     {
         var session = new FakeCaptureSession(CreateSpeechAudio() with
@@ -626,17 +661,31 @@ public sealed class LiveDictationControllerTests
         IAudioCaptureSession,
         IAudioLevelSource
     {
+        private EventHandler<AudioLevelChangedEvent>? _levelChanged;
+
         public bool StopCalled { get; private set; }
 
         public bool CancelCalled { get; private set; }
 
         public bool Disposed { get; private set; }
 
-        public event EventHandler<AudioLevelChangedEvent>? LevelChanged;
+        public int StopCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public int LevelSubscriberCount =>
+            _levelChanged?.GetInvocationList().Length ?? 0;
+
+        public event EventHandler<AudioLevelChangedEvent>? LevelChanged
+        {
+            add => _levelChanged += value;
+            remove => _levelChanged -= value;
+        }
 
         public Task<CapturedAudio> StopAsync(CancellationToken cancellationToken)
         {
             StopCalled = true;
+            StopCount++;
             return Task.FromResult(audio);
         }
 
@@ -649,11 +698,12 @@ public sealed class LiveDictationControllerTests
         public ValueTask DisposeAsync()
         {
             Disposed = true;
+            DisposeCount++;
             return ValueTask.CompletedTask;
         }
 
         public void PublishLevel(double rootMeanSquare, double peak) =>
-            LevelChanged?.Invoke(this, new(rootMeanSquare, peak));
+            _levelChanged?.Invoke(this, new(rootMeanSquare, peak));
     }
 
     private sealed class FakeTranscriptionEngine : ITranscriptionEngine
@@ -747,6 +797,8 @@ public sealed class LiveDictationControllerTests
 
     private sealed class FakeTextInsertionService : ITextInsertionService
     {
+        public int CallCount { get; private set; }
+
         public string? Text { get; private set; }
 
         public ForegroundTarget? Target { get; private set; }
@@ -761,6 +813,7 @@ public sealed class LiveDictationControllerTests
             InsertionSettings settings,
             CancellationToken cancellationToken)
         {
+            CallCount++;
             Text = text;
             Target = target;
             Settings = settings;

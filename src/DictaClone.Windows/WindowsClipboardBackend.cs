@@ -12,10 +12,13 @@ internal sealed partial class WindowsClipboardBackend : IClipboardBackend
         IDataObject? source = Clipboard.GetDataObject();
         if (source is null)
         {
+            ClipboardNativeFormatGuard.EnsureCaptureConsistent(
+                capturedFormatCount: 0);
             return new(Data: null);
         }
 
         var snapshot = new DataObject();
+        int capturedFormatCount = 0;
         foreach (string format in source.GetFormats(autoConvert: false))
         {
             object? data = source.GetData(format, autoConvert: false);
@@ -25,20 +28,40 @@ internal sealed partial class WindowsClipboardBackend : IClipboardBackend
                     format,
                     autoConvert: false,
                     CloneClipboardValue(data));
+                capturedFormatCount++;
             }
         }
 
+        ClipboardNativeFormatGuard.EnsureCaptureConsistent(
+            capturedFormatCount);
         return new(snapshot);
     }
 
-    public void SetUnicodeText(string text) =>
+    public void SetUnicodeText(string text)
+    {
         Clipboard.SetText(text, TextDataFormat.UnicodeText);
+        bool containsText = Clipboard.ContainsText(
+            TextDataFormat.UnicodeText);
+        string actual = containsText
+            ? Clipboard.GetText(TextDataFormat.UnicodeText)
+            : string.Empty;
+        if (!string.Equals(text, actual, StringComparison.Ordinal))
+        {
+            throw new ClipboardFormatUnavailableException(
+                "Clipboard text was not published after it was set.");
+        }
+    }
 
     public void Restore(ClipboardSnapshot snapshot)
     {
         if (snapshot.Data is IDataObject data)
         {
+            int expectedFormatCount = data
+                .GetFormats(autoConvert: false)
+                .Length;
             Clipboard.SetDataObject(data, copy: true);
+            ClipboardNativeFormatGuard.EnsureRestoreConsistent(
+                expectedFormatCount);
         }
         else
         {

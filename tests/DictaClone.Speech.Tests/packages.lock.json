@@ -115,7 +115,7 @@
       "dictaclone.speech": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[1.0.0, )",
+          "DictaClone.Core": "[0.1.0, )",
           "Whisper.net": "[1.9.1, )",
           "Whisper.net.Runtime": "[1.9.1, )"
         }

@@ -1,8 +1,10 @@
 # DictaClone implementation plan
 
-Status: Milestones 0-6 complete and accepted; Milestone 7 is next.
+Status: Milestones 0-6 complete and accepted; Milestone 7 implementation and
+automated qualification are complete. Manual acceptance is deferred until a
+new Windows 11 x64 laptop is available.
 
-Last reviewed: 2026-08-04
+Last reviewed: 2026-08-05
 
 ## 1. Product goal
 

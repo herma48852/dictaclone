@@ -9,6 +9,8 @@ public sealed class TextInsertionService : ITextInsertionService
 {
     private static readonly TimeSpan DefaultClipboardRetryDelay =
         TimeSpan.FromMilliseconds(15);
+    private static readonly TimeSpan DefaultClipboardReadyDelay =
+        TimeSpan.FromMilliseconds(25);
     private static readonly TimeSpan DefaultClipboardRestoreDelay =
         TimeSpan.FromMilliseconds(250);
     private const int DefaultClipboardAttempts = 5;
@@ -19,6 +21,7 @@ public sealed class TextInsertionService : ITextInsertionService
     private readonly IInsertionDelay _delay;
     private readonly int _clipboardAttempts;
     private readonly TimeSpan _clipboardRetryDelay;
+    private readonly TimeSpan _clipboardReadyDelay;
     private readonly TimeSpan _clipboardRestoreDelay;
 
     public TextInsertionService()
@@ -29,6 +32,7 @@ public sealed class TextInsertionService : ITextInsertionService
             new InsertionDelay(),
             DefaultClipboardAttempts,
             DefaultClipboardRetryDelay,
+            DefaultClipboardReadyDelay,
             DefaultClipboardRestoreDelay)
     {
     }
@@ -40,6 +44,7 @@ public sealed class TextInsertionService : ITextInsertionService
         IInsertionDelay delay,
         int clipboardAttempts = DefaultClipboardAttempts,
         TimeSpan? clipboardRetryDelay = null,
+        TimeSpan? clipboardReadyDelay = null,
         TimeSpan? clipboardRestoreDelay = null)
     {
         _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
@@ -50,6 +55,8 @@ public sealed class TextInsertionService : ITextInsertionService
         _clipboardAttempts = clipboardAttempts;
         _clipboardRetryDelay =
             clipboardRetryDelay ?? DefaultClipboardRetryDelay;
+        _clipboardReadyDelay =
+            clipboardReadyDelay ?? DefaultClipboardReadyDelay;
         _clipboardRestoreDelay =
             clipboardRestoreDelay ?? DefaultClipboardRestoreDelay;
     }
@@ -121,6 +128,12 @@ public sealed class TextInsertionService : ITextInsertionService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _delay.Wait(_clipboardReadyDelay, cancellationToken);
+            if (_clipboard.GetSequenceNumber() != insertionSequence)
+            {
+                throw new ClipboardContentionException();
+            }
+
             _keyboard.SendClipboardInsert(shortcut);
             _delay.Wait(_clipboardRestoreDelay, cancellationToken);
         }

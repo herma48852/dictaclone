@@ -74,7 +74,7 @@ try {
         --no-build `
         --no-restore `
         --filter `
-        'Category=DesktopE2E' `
+        'Category=DesktopE2E&Category!=ManualDesktopStress' `
         '-maxcpucount:1'
 }
 finally {

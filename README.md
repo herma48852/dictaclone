@@ -17,12 +17,13 @@ through sequence-safe Paste Mode or normally clipboard-free Typing Mode. Native
 GNU Emacs uses a clipboard-preserving `Ctrl+Y` compatibility path because its
 standard key map does not paste with `Ctrl+V` and did not accept DictaClone's
 synthetic character stream. Milestone 5 persistence, recovery, knowledge,
-diagnostics, and desktop polish is accepted. Its 229 automated Release cases
-pass with 93.88% Core line coverage. Milestone 6 Smart Edit and selected-text
-editing is accepted. Its cloud path is off by default, keeps provider keys in
-Windows Credential Manager, and revalidates the foreground target and exact
-selection before replacement. Milestone 7 packaging and release qualification
-is next.
+diagnostics, and desktop polish is accepted. Milestone 6 Smart Edit and
+selected-text editing is accepted. Its cloud path is off by default, keeps
+provider keys in Windows Credential Manager, and revalidates the foreground
+target and exact selection before replacement. Milestone 7 packaging is
+implemented and its automated release qualification passes. Manual installer,
+portable, offline-restart, and uninstall acceptance is deferred until testing
+can be performed on a new Windows 11 x64 laptop.
 
 The default dictation trigger is `Ctrl+Win+Space`; the primary key prevents
 Windows' `Ctrl+Win+Arrow` virtual-desktop shortcuts from starting a recording.
@@ -54,6 +55,10 @@ knowledge, recovery, diagnostics, and desktop-polish progress.
 
 See the [Milestone 6 status](docs/MILESTONE_6_STATUS.md) for Smart Edit privacy,
 provider, selected-text safety, automated evidence, and manual-review steps.
+
+See the [Milestone 7 status](docs/MILESTONE_7_STATUS.md) for packaging behavior,
+release artifacts and checksums, automated qualification, and the pending
+manual-review steps.
 
 See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
 cross-platform boundaries and native macOS replacements.
@@ -119,6 +124,18 @@ with:
 .\scripts\Invoke-Milestone6Regression.ps1 -NoBuild
 .\scripts\Invoke-Milestone6ManualTest.ps1 -NoBuild
 ```
+
+Build and validate the Windows x64 release, then print the complete Milestone 7
+manual review with:
+
+```powershell
+.\scripts\Invoke-Milestone7Regression.ps1
+.\scripts\Invoke-Milestone7ManualTest.ps1
+```
+
+Release creation refuses a dirty worktree by default. The regression command
+uses a dirty qualification build so an uncommitted milestone can be reviewed;
+rebuild distribution artifacts from a clean accepted commit.
 
 The optional live-provider contract test is excluded from every normal test
 command. It runs only when an API key is present and the caller supplies the

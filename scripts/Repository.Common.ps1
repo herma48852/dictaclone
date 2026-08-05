@@ -27,6 +27,47 @@ function Get-RepositoryDotNet {
     return $installedDotNet.Source
 }
 
+function Get-RepositoryVersion {
+    $buildProperties = Join-Path $script:RepositoryRoot 'Directory.Build.props'
+    [xml] $document = Get-Content -LiteralPath $buildProperties -Raw
+    $versionNode = $document.SelectSingleNode(
+        '/Project/PropertyGroup/VersionPrefix')
+    $version = if ($null -eq $versionNode) {
+        $null
+    }
+    else {
+        $versionNode.InnerText
+    }
+
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        throw 'Directory.Build.props does not define VersionPrefix.'
+    }
+
+    return [string] $version
+}
+
+function Assert-RepositoryChildPath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    $repositoryPath = [IO.Path]::GetFullPath($script:RepositoryRoot)
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    $prefix = $repositoryPath.TrimEnd(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar) +
+        [IO.Path]::DirectorySeparatorChar
+
+    if (!$resolvedPath.StartsWith(
+            $prefix,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path must remain inside the repository: $resolvedPath"
+    }
+
+    return $resolvedPath
+}
+
 function Invoke-CheckedCommand {
     param(
         [Parameter(Mandatory)]

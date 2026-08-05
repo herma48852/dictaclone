@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -70,6 +71,64 @@ public sealed partial class InsertionEndToEndTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "DesktopE2E")]
+    [Trait("Category", "ManualDesktopStress")]
+    public async Task FiftyConsecutiveInsertionCycles_PreserveClipboardAndTarget()
+    {
+        await using TestTargetClient target = await TestTargetClient.StartAsync();
+        using var clipboardSession = new ClipboardStaSession();
+        IDataObject? originalClipboard = await clipboardSession.InvokeAsync(
+            CaptureClipboard);
+
+        try
+        {
+            const string sentinel = "DictaClone 50-cycle clipboard sentinel";
+            var foreground = new ForegroundTargetService();
+            var insertion = new TextInsertionService();
+
+            for (int cycle = 0; cycle < 50; cycle++)
+            {
+                string expected = $"release cycle {cycle + 1:D2} 😀";
+                await target.ClearAndFocusAsync();
+                await SetClipboardTextWithRetryAsync(
+                    clipboardSession,
+                    sentinel);
+                Assert.Equal(
+                    sentinel,
+                    await clipboardSession.InvokeAsync(Clipboard.GetText));
+                ForegroundTarget captured = await foreground.CaptureAsync(
+                    CancellationToken.None);
+                TextInsertionMode mode = cycle % 10 == 9
+                    ? TextInsertionMode.DelayedTyping
+                    : TextInsertionMode.Paste;
+
+                await insertion.InsertAsync(
+                    expected,
+                    captured,
+                    new(mode, TimeSpan.Zero),
+                    CancellationToken.None);
+
+                Assert.Equal(expected, await target.WaitForTextAsync(expected));
+                string clipboard = await WaitForClipboardTextAsync(
+                    clipboardSession,
+                    sentinel);
+                Assert.True(
+                    string.Equals(
+                        sentinel,
+                        clipboard,
+                        StringComparison.Ordinal),
+                    $"Clipboard mismatch after cycle {cycle + 1} in {mode}; " +
+                    $"actual length was {clipboard.Length}.");
+            }
+        }
+        finally
+        {
+            await clipboardSession.InvokeAsync(
+                () => RestoreClipboard(originalClipboard));
+        }
+    }
+
     private static IDataObject? CaptureClipboard()
     {
         IDataObject? source = Clipboard.GetDataObject();
@@ -109,6 +168,115 @@ public sealed partial class InsertionEndToEndTests
             action();
             return true;
         });
+
+    private static async Task<string> WaitForClipboardTextAsync(
+        ClipboardStaSession clipboardSession,
+        string expected)
+    {
+        var timeout = Stopwatch.StartNew();
+        string actual;
+        do
+        {
+            actual = await clipboardSession.InvokeAsync(Clipboard.GetText);
+            if (string.Equals(actual, expected, StringComparison.Ordinal))
+            {
+                return actual;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(25));
+        }
+        while (timeout.Elapsed < TimeSpan.FromSeconds(2));
+
+        return actual;
+    }
+
+    private static async Task SetClipboardTextWithRetryAsync(
+        ClipboardStaSession clipboardSession,
+        string text)
+    {
+        for (int attempt = 1; attempt <= 5; attempt++)
+        {
+            bool published = await clipboardSession.InvokeAsync(() =>
+            {
+                Clipboard.SetText(text, TextDataFormat.UnicodeText);
+                return Clipboard.ContainsText(TextDataFormat.UnicodeText) &&
+                    string.Equals(
+                        text,
+                        Clipboard.GetText(TextDataFormat.UnicodeText),
+                        StringComparison.Ordinal);
+            });
+            if (published)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(15 * attempt));
+        }
+
+        Assert.Fail("The test sentinel could not be published to the clipboard.");
+    }
+
+    private sealed class ClipboardStaSession : IDisposable
+    {
+        private readonly BlockingCollection<Action> _actions = new();
+        private readonly Thread _thread;
+
+        public ClipboardStaSession()
+        {
+            using var started = new ManualResetEventSlim();
+            _thread = new Thread(() =>
+            {
+                started.Set();
+                foreach (Action action in _actions.GetConsumingEnumerable())
+                {
+                    action();
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "DictaClone E2E Clipboard Owner",
+            };
+            _thread.SetApartmentState(ApartmentState.STA);
+            _thread.Start();
+            Assert.True(
+                started.Wait(TimeSpan.FromSeconds(5)),
+                "The clipboard STA thread did not start.");
+        }
+
+        public Task<bool> InvokeAsync(Action action) =>
+            InvokeAsync(() =>
+            {
+                action();
+                return true;
+            });
+
+        public Task<T> InvokeAsync<T>(Func<T> action)
+        {
+            var completion = new TaskCompletionSource<T>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _actions.Add(() =>
+            {
+                try
+                {
+                    completion.TrySetResult(action());
+                }
+                catch (Exception exception)
+                {
+                    completion.TrySetException(exception);
+                }
+            });
+            return completion.Task;
+        }
+
+        public void Dispose()
+        {
+            _actions.CompleteAdding();
+            Assert.True(
+                _thread.Join(millisecondsTimeout: 5_000),
+                "The clipboard STA thread did not stop.");
+            _actions.Dispose();
+        }
+    }
 
     private static Task<T> RunStaAsync<T>(Func<T> action)
     {
@@ -219,8 +387,24 @@ public sealed partial class InsertionEndToEndTests
         public async Task ClearAndFocusAsync()
         {
             Assert.Equal("OK", await SendAsync("CLEAR"));
-            Assert.Equal("OK", await SendAsync("FOCUS"));
-            await Task.Delay(TimeSpan.FromMilliseconds(75));
+            var timeout = Stopwatch.StartNew();
+            do
+            {
+                Assert.Equal("OK", await SendAsync("FOCUS"));
+                _process.Refresh();
+                nint targetWindow = _process.MainWindowHandle;
+                if (targetWindow != nint.Zero &&
+                    GetForegroundWindow() == targetWindow)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(50));
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(50));
+            }
+            while (timeout.Elapsed < TimeSpan.FromSeconds(5));
+
+            Assert.Fail("The DictaClone test target did not become foreground.");
         }
 
         public async Task<string> GetTextAsync()
@@ -306,4 +490,7 @@ public sealed partial class InsertionEndToEndTests
 
     [LibraryImport("user32.dll")]
     private static partial uint GetClipboardSequenceNumber();
+
+    [LibraryImport("user32.dll")]
+    private static partial nint GetForegroundWindow();
 }

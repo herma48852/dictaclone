@@ -9,6 +9,9 @@ public sealed class ProductInfoTests
     {
         Assert.Equal("DictaClone", ProductInfo.Name);
         Assert.Equal(new Version(0, 1, 0), ProductInfo.DevelopmentVersion);
+        Assert.Equal(
+            new Version(0, 1, 0, 0),
+            typeof(ProductInfo).Assembly.GetName().Version);
     }
 
     [Fact]
