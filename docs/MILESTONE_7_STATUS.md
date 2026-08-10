@@ -41,6 +41,13 @@ milestone is intentionally uncommitted during review, its manifest records
 `sourceDirty: true` and commit `59186b2`. Rebuild release artifacts from the
 clean accepted commit before distribution.
 
+Generated release artifacts are excluded from Git and are not present in a
+fresh clone. For clean-room review, transfer the complete
+`artifacts\release\<version>` directory from the build machine. The manual-review
+script accepts its location through `-ReleaseDirectory`. Building the artifacts
+from source requires Inno Setup 6.7.3; running the self-contained installer and
+portable application does not.
+
 ## Automated evidence
 
 - The clean Release build completed with zero warnings and zero errors.

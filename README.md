@@ -73,6 +73,12 @@ cross-platform boundaries and native macOS replacements.
 
 ## Development
 
+Prerequisites for source builds are Windows 11 x64, Windows PowerShell 5.1 or
+later, Git, and internet access for the initial SDK and NuGet package downloads.
+Release artifact generation additionally requires Inno Setup 6.7.3; a
+current-user installation is sufficient. `ISCC.exe` may be on `PATH`, supplied through
+`DICTACLONE_ISCC`, or passed with `-InnoCompilerPath`.
+
 Install the pinned repository-local SDK, then run a clean restore, build, and
 test:
 
@@ -80,6 +86,10 @@ test:
 .\scripts\Install-DotNet.ps1
 .\scripts\Test.ps1 -Clean
 ```
+
+The build and test scripts perform their locked restore before cleaning, so a
+retry can recover after an interrupted initial download without deleting
+generated directories manually.
 
 Run the enforced Core coverage gate with:
 
@@ -132,6 +142,23 @@ manual review with:
 .\scripts\Invoke-Milestone7Regression.ps1
 .\scripts\Invoke-Milestone7ManualTest.ps1
 ```
+
+For clean-room testing, build from a clean accepted commit on the build machine
+and transfer the complete `artifacts\release\<version>` directory, including
+the installer, portable ZIP, manifest, and `SHA256SUMS.txt`. On the clean test
+machine, clone the same commit and either place that directory at the same
+repository-relative location or pass its full path explicitly:
+
+```powershell
+.\scripts\Invoke-Milestone7ManualTest.ps1 `
+    -ReleaseDirectory 'D:\DictaClone-0.1.0'
+```
+
+Leave the keyboard, mouse, clipboard, and foreground window untouched while
+the manual guide's desktop stress command runs. The installer and portable
+application are self-contained; the SDK and Inno Setup are needed only when
+building or running source-based automated tests, not when exercising those
+release artifacts.
 
 Release creation refuses a dirty worktree by default. The regression command
 uses a dirty qualification build so an uncommitted milestone can be reviewed;

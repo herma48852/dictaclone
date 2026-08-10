@@ -1,13 +1,19 @@
 [CmdletBinding()]
-param()
+param(
+    [string] $ReleaseDirectory
+)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Repository.Common.ps1')
 
 $version = Get-RepositoryVersion
-$releaseDirectory = Join-Path `
-    $script:RepositoryRoot `
-    (Join-Path 'artifacts\release' $version)
+if ([string]::IsNullOrWhiteSpace($ReleaseDirectory)) {
+    $ReleaseDirectory = Join-Path `
+        $script:RepositoryRoot `
+        (Join-Path 'artifacts\release' $version)
+}
+
+$releaseDirectory = [IO.Path]::GetFullPath($ReleaseDirectory)
 $installer = Join-Path `
     $releaseDirectory `
     "DictaClone-$version-win-x64-setup.exe"
@@ -17,7 +23,10 @@ $portable = Join-Path `
 
 foreach ($path in @($installer, $portable)) {
     if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Release artifact is missing. Run .\scripts\Invoke-Milestone7Regression.ps1 first: $path"
+        throw ('Release artifact is missing. Supply the complete release ' +
+            'directory with -ReleaseDirectory, or install Inno Setup 6.7.3 ' +
+            'and run .\scripts\Invoke-Milestone7Regression.ps1 first: ' +
+            $path)
     }
 }
 
