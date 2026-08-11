@@ -61,8 +61,9 @@ release artifacts and checksums, automated qualification, and the pending
 manual-review steps.
 
 See the [clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
-for checksum verification, installer and portable setup, first-run model
-download, offline dictation, and removal on Windows 11 x64.
+for downloading the qualified GitHub release assets, checksum verification,
+installer and portable setup, first-run model download, offline dictation, and
+removal on Windows 11 x64.
 
 See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
 cross-platform boundaries and native macOS replacements.
@@ -147,13 +148,18 @@ manual review with:
 .\scripts\Invoke-Milestone7ManualTest.ps1
 ```
 
-For clean-room testing, build from a clean accepted commit on the build machine
-and transfer the complete `artifacts\release\<version>` directory, including
-the installer, portable ZIP, `CLEAN_ROOM_INSTALLATION.md`, manifest, and
-`SHA256SUMS.txt`. Follow the copied guide for installation and ordinary use. For
-the complete acceptance review, clone the same commit on the clean test machine
-and either place that directory at the same repository-relative location or
-pass its full path explicitly:
+For clean-room testing of version 0.1.0, open the
+[GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.0),
+expand **Assets**, and download the installer, the specifically named portable
+ZIP, `CLEAN_ROOM_INSTALLATION.md`, `release-manifest.json`, and
+`SHA256SUMS.txt` into one folder. Do not use GitHub's automatically generated
+**Source code (zip)** as the portable application. Follow the downloaded guide
+for checksum verification, installation, and ordinary use.
+
+As an offline alternative, transfer the complete
+`artifacts\release\<version>` directory from the trusted build machine. For the
+complete acceptance review, clone tag `v0.1.0` on the clean test machine and
+pass the full path of the downloaded or transferred release folder explicitly:
 
 ```powershell
 .\scripts\Invoke-Milestone7ManualTest.ps1 `

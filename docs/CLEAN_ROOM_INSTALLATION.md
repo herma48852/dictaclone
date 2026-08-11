@@ -10,17 +10,28 @@ download. Normal dictation works offline after that model has been downloaded.
 
 ## Before installation
 
-Obtain the complete versioned release directory. It must contain:
+For the current qualification build, open the
+[DictaClone 0.1.0 GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.0),
+expand **Assets**, and download these five files into one new folder:
 
-- `DictaClone-<version>-win-x64-setup.exe`;
-- `DictaClone-<version>-win-x64-portable.zip`;
+- `DictaClone-0.1.0-win-x64-setup.exe`;
+- `DictaClone-0.1.0-win-x64-portable.zip`;
 - `CLEAN_ROOM_INSTALLATION.md`;
 - `release-manifest.json`; and
 - `SHA256SUMS.txt`.
 
-Confirm `SHA256SUMS.txt` against a trusted copy supplied by the release owner,
-then verify every listed file before running the installer or portable
-application. In PowerShell, change to the release directory and run:
+Do not download GitHub's automatically generated **Source code (zip)** or
+**Source code (tar.gz)** archives in place of the named portable ZIP. Those
+archives contain repository source, not the runnable self-contained
+application.
+
+Keep the downloaded filenames unchanged so checksum verification can find
+them. If the clean machine has no internet access, copy the complete five-file
+release folder from a trusted machine instead.
+
+Confirm `SHA256SUMS.txt` against the copy supplied by the release owner, then
+verify every listed file before running the installer or portable application.
+In PowerShell, change to the folder containing the five downloads and run:
 
 ```powershell
 foreach ($taskLine in Get-Content .\SHA256SUMS.txt) {
