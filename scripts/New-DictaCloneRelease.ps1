@@ -50,6 +50,15 @@ if (Test-Path -LiteralPath $releaseDirectory) {
 
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 
+$installationGuidePath = Join-Path `
+    $releaseDirectory `
+    'CLEAN_ROOM_INSTALLATION.md'
+Copy-Item `
+    -LiteralPath (Join-Path `
+        $script:RepositoryRoot `
+        'docs\CLEAN_ROOM_INSTALLATION.md') `
+    -Destination $installationGuidePath
+
 & (Join-Path $PSScriptRoot 'Publish-DictaClone.ps1') `
     -Version $Version `
     -OutputDirectory $stagingDirectory |
@@ -82,7 +91,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $artifactEntries = @()
-foreach ($path in @($portablePath, $installerPath)) {
+foreach ($path in @($portablePath, $installerPath, $installationGuidePath)) {
     $file = Get-Item -LiteralPath $path
     $artifactEntries += [ordered]@{
         file = $file.Name
@@ -115,7 +124,11 @@ $manifest |
     ConvertTo-Json -Depth 8 |
     Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
-$checksumPaths = @($portablePath, $installerPath, $manifestPath) |
+$checksumPaths = @(
+    $portablePath,
+    $installerPath,
+    $installationGuidePath,
+    $manifestPath) |
     Sort-Object { [IO.Path]::GetFileName($_) }
 $checksumLines = foreach ($path in $checksumPaths) {
     $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()

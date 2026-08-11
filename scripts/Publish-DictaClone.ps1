@@ -94,7 +94,8 @@ $requiredFiles = @(
     'THIRD-PARTY-NOTICES.md',
     'MODEL-LICENSES.md',
     'RELEASE_NOTES.md',
-    'ROLLBACK.md'
+    'ROLLBACK.md',
+    'CLEAN_ROOM_INSTALLATION.md'
 )
 
 foreach ($file in $requiredFiles) {

@@ -20,8 +20,11 @@ $installer = Join-Path `
 $portable = Join-Path `
     $releaseDirectory `
     "DictaClone-$version-win-x64-portable.zip"
+$installationGuide = Join-Path `
+    $releaseDirectory `
+    'CLEAN_ROOM_INSTALLATION.md'
 
-foreach ($path in @($installer, $portable)) {
+foreach ($path in @($installer, $portable, $installationGuide)) {
     if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
         throw ('Release artifact is missing. Supply the complete release ' +
             'directory with -ReleaseDirectory, or install Inno Setup 6.7.3 ' +
@@ -36,6 +39,7 @@ DictaClone Milestone 7 manual release review
 Artifacts:
   Installer: $installer
   Portable:  $portable
+  Guide:     $installationGuide
 
 Use a clean Windows 11 x64 test user if one is available. Do not use an account
 with another DictaClone installation.
@@ -53,10 +57,11 @@ with another DictaClone installation.
    - Extract the portable ZIP to a new folder and run DictaClone.App.exe.
    - Confirm Windows does not ask for a .NET runtime installation.
    - In the first-run window titled "DictaClone first-run setup", select the
-     complete control "Microphone", select "Local model" = base.en, and select
-     "Complete first-run setup". Allow the verified model download to finish.
+     "Microphone" and "Local model" = base.en controls, then select "Apply
+     settings". Under "Privacy & recovery", select "Complete setup".
    - Open Notepad. Hold Ctrl+Win+Space, say "portable dictation works", release,
-     and confirm the text is inserted.
+     allow the verified model download to finish, and confirm the text is
+     inserted.
    - Exit using "Exit DictaClone" on the notification-area icon.
 
 2. Per-user installer

@@ -60,6 +60,10 @@ See the [Milestone 7 status](docs/MILESTONE_7_STATUS.md) for packaging behavior,
 release artifacts and checksums, automated qualification, and the pending
 manual-review steps.
 
+See the [clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
+for checksum verification, installer and portable setup, first-run model
+download, offline dictation, and removal on Windows 11 x64.
+
 See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
 cross-platform boundaries and native macOS replacements.
 
@@ -145,9 +149,11 @@ manual review with:
 
 For clean-room testing, build from a clean accepted commit on the build machine
 and transfer the complete `artifacts\release\<version>` directory, including
-the installer, portable ZIP, manifest, and `SHA256SUMS.txt`. On the clean test
-machine, clone the same commit and either place that directory at the same
-repository-relative location or pass its full path explicitly:
+the installer, portable ZIP, `CLEAN_ROOM_INSTALLATION.md`, manifest, and
+`SHA256SUMS.txt`. Follow the copied guide for installation and ordinary use. For
+the complete acceptance review, clone the same commit on the clean test machine
+and either place that directory at the same repository-relative location or
+pass its full path explicitly:
 
 ```powershell
 .\scripts\Invoke-Milestone7ManualTest.ps1 `

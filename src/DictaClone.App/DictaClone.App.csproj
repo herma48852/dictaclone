@@ -35,5 +35,8 @@
     <None Include="../../docs/ROLLBACK.md"
           Link="ROLLBACK.md"
           CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/CLEAN_ROOM_INSTALLATION.md"
+          Link="CLEAN_ROOM_INSTALLATION.md"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

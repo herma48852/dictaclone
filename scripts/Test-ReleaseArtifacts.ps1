@@ -27,6 +27,7 @@ $installerName = "DictaClone-$Version-win-x64-setup.exe"
 $requiredArtifacts = @(
     $portableName,
     $installerName,
+    'CLEAN_ROOM_INSTALLATION.md',
     'release-manifest.json',
     'SHA256SUMS.txt'
 )
@@ -52,6 +53,7 @@ foreach ($line in Get-Content -LiteralPath $checksumPath) {
 $expectedChecksumNames = @(
     $portableName,
     $installerName,
+    'CLEAN_ROOM_INSTALLATION.md',
     'release-manifest.json'
 )
 foreach ($name in $expectedChecksumNames) {
@@ -103,7 +105,8 @@ try {
         'THIRD-PARTY-NOTICES.md',
         'MODEL-LICENSES.md',
         'RELEASE_NOTES.md',
-        'ROLLBACK.md'
+        'ROLLBACK.md',
+        'CLEAN_ROOM_INSTALLATION.md'
     )
     foreach ($name in $requiredPayloadFiles) {
         if (!(Test-Path -LiteralPath `

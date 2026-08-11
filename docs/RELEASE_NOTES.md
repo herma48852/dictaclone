@@ -16,6 +16,8 @@ Release status: pre-release qualification build for Windows 11 x64.
   Credential Manager.
 - A portable self-contained `win-x64` archive and a non-administrator,
   per-user installer.
+- A clean-room guide covering checksum verification, installation, first use,
+  offline dictation, portable use, and removal.
 
 ## Installation behavior
 
