@@ -163,7 +163,7 @@ Start the review build with:
 
 Accepted:
 
-1. Hold `Ctrl+Win+Space`, speak, and release; recognized text appears in the
+1. Hold the current default `Ctrl+Shift+Space`, speak, and release; recognized text appears in the
    status pill. **Passed in live user testing.** Cursor insertion is
    intentionally deferred to Milestone 4.
 

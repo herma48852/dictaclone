@@ -11,11 +11,11 @@ download. Normal dictation works offline after that model has been downloaded.
 ## Before installation
 
 For the current qualification build, open the
-[DictaClone 0.1.0 GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.0),
+[DictaClone 0.1.1 GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.1),
 expand **Assets**, and download these five files into one new folder:
 
-- `DictaClone-0.1.0-win-x64-setup.exe`;
-- `DictaClone-0.1.0-win-x64-portable.zip`;
+- `DictaClone-0.1.1-win-x64-setup.exe`;
+- `DictaClone-0.1.1-win-x64-portable.zip`;
 - `CLEAN_ROOM_INSTALLATION.md`;
 - `release-manifest.json`; and
 - `SHA256SUMS.txt`.
@@ -79,12 +79,20 @@ created only after it is selected in DictaClone settings and applied.
 
 1. Open Notepad or another non-elevated application and place the text cursor
    in an editable field.
-2. Hold `Ctrl+Win+Space`. The **Listening** status appears without taking focus
-   from the target application.
-3. Speak, then release the shortcut. DictaClone transcribes locally and inserts
-   the result at the original cursor position.
-4. Use `Ctrl+Win+Escape` to cancel an active dictation. If an application does
+2. Hold `Ctrl+Shift+Space`. The red **Listening** status appears without taking
+   focus from the target application.
+3. Speak while holding the shortcut. Wait until the green level bar moves,
+   then release it. DictaClone transcribes locally and inserts the result at
+   the original cursor position.
+4. Use `Ctrl+Alt+Escape` to cancel an active dictation. If an application does
    not accept normal Paste Mode, use `Ctrl+Alt+Space` for Typing Mode.
+
+DictaClone consumes the completed dictation shortcut so it does not type a
+space or invoke a foreground command. In Windows Terminal, including Codex
+CLI, Paste Mode automatically uses the terminal's `Ctrl+Shift+V` text-paste
+path. In native GNU Emacs, both Dictation and Typing Mode automatically use
+Emacs's `Ctrl+Y` yank path and restore the previous clipboard afterward. No
+Emacs key-map change is required.
 
 Right-click the **DictaClone** notification-area icon to open settings, copy the
 last result, view enabled transcript history, or exit. Closing the settings

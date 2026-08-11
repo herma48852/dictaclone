@@ -1,4 +1,4 @@
-# DictaClone 0.1.0 release notes
+# DictaClone 0.1.1 release notes
 
 Release status: pre-release qualification build for Windows 11 x64.
 
@@ -9,6 +9,11 @@ Release status: pre-release qualification build for Windows 11 x64.
   downloads.
 - Sequence-safe Paste Mode, clipboard-free Typing Mode, and GNU Emacs paste
   compatibility.
+- Foreground-aware paste shortcuts: `Ctrl+Shift+V` for Windows Terminal and
+  Codex CLI, and clipboard-preserving `Ctrl+Y` for native GNU Emacs.
+- A Win-free `Ctrl+Shift+Space` dictation default whose primary key is consumed
+  by DictaClone, avoiding leaked shortcut commands in Emacs. Exact legacy
+  defaults migrate automatically while customized hotkeys remain unchanged.
 - Durable settings, vocabulary, expansions, optional transcript history,
   privacy-safe diagnostics, and settings recovery.
 - Optional selected-text Smart Edit through an explicitly configured provider.

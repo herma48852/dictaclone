@@ -54,9 +54,9 @@ Milestone 5 manual review (uses %LocalAppData%\DictaClone):
    its X button. Right-click the "DictaClone" notification-area icon, select
    "Open settings", select the "Knowledge" tab, and verify all three values.
    For the Paste Mode baseline, open Windows Notepad, click its main editing
-   area, hold Ctrl+Win+Space, say "open the jay son file", and release; the
+   area, hold Ctrl+Shift+Space, say "open the jay son file", and release; the
    inserted text should contain "JSON". For native GNU Emacs, place point in an
-   editable buffer, hold the default Dictation shortcut Ctrl+Win+Space, say the
+   editable buffer, hold the default Dictation shortcut Ctrl+Shift+Space, say the
    same phrase, and release. DictaClone should use Emacs's Ctrl+Y yank command,
    insert text containing "JSON", and restore the previous Windows clipboard.
    Repeat in a new blank line with the DictaClone Typing Mode shortcut

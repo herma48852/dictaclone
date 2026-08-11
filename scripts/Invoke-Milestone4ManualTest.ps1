@@ -129,7 +129,7 @@ Write-Output @'
 Milestone 4 manual compatibility check:
 1. In any editor, copy the text "M4 clipboard sentinel" so it is on the
    clipboard. Focus a blank insertion point in the selected target.
-2. Hold Ctrl+Win+Space, say "testing one two three", and release. Paste Mode
+2. Hold Ctrl+Shift+Space, say "testing one two three", and release. Paste Mode
    should insert the recognized text at the original cursor. Pasting manually
    afterward should still produce the clipboard sentinel.
 3. Reset the sentinel, focus a blank insertion point, hold Ctrl+Alt+Space,

@@ -25,22 +25,42 @@ internal sealed partial class SendInputKeyboardInjector : IKeyboardInjector
 
     public void SendClipboardInsert(ClipboardInsertionShortcut shortcut)
     {
-        ushort virtualKey = shortcut switch
+        ClipboardInsertionKeystroke keystroke =
+            GetClipboardInsertionKeystroke(shortcut);
+        SendVirtualKeyChord(
+            keystroke.VirtualKey,
+            keystroke.Shift,
+            keystroke.Control,
+            keystroke.Alt,
+            keystroke.UseScanCodes);
+    }
+
+    internal static ClipboardInsertionKeystroke GetClipboardInsertionKeystroke(
+        ClipboardInsertionShortcut shortcut) => shortcut switch
         {
-            ClipboardInsertionShortcut.StandardPaste => VirtualKeyV,
-            ClipboardInsertionShortcut.EmacsYank => VirtualKeyY,
+            ClipboardInsertionShortcut.StandardPaste => new(
+                VirtualKeyV,
+                Shift: false,
+                Control: true,
+                Alt: false,
+                UseScanCodes: false),
+            ClipboardInsertionShortcut.TerminalPaste => new(
+                VirtualKeyV,
+                Shift: true,
+                Control: true,
+                Alt: false,
+                UseScanCodes: true),
+            ClipboardInsertionShortcut.EmacsYank => new(
+                VirtualKeyY,
+                Shift: false,
+                Control: true,
+                Alt: false,
+                UseScanCodes: false),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(shortcut),
                 shortcut,
                 "Unknown clipboard insertion shortcut."),
         };
-        SendVirtualKeyChord(
-            virtualKey,
-            shift: false,
-            control: true,
-            alt: false,
-            useScanCodes: false);
-    }
 
     internal static void SendSelectionCopy(bool emacs) => SendVirtualKeyChord(
         emacs ? VirtualKeyW : VirtualKeyC,
@@ -273,3 +293,10 @@ internal sealed partial class SendInputKeyboardInjector : IKeyboardInjector
         uint mapType,
         nint keyboardLayout);
 }
+
+internal readonly record struct ClipboardInsertionKeystroke(
+    ushort VirtualKey,
+    bool Shift,
+    bool Control,
+    bool Alt,
+    bool UseScanCodes);

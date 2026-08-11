@@ -218,7 +218,7 @@ public static class HotkeyDefaults
         new(
             HotkeyAction.Dictation,
             new HotkeyChord(
-                HotkeyModifiers.Control | HotkeyModifiers.Windows,
+                HotkeyModifiers.Control | HotkeyModifiers.Shift,
                 HotkeyKey.Space)),
         new(
             HotkeyAction.SmartEdit,
@@ -235,7 +235,7 @@ public static class HotkeyDefaults
         new(
             HotkeyAction.Cancel,
             new HotkeyChord(
-                HotkeyModifiers.Control | HotkeyModifiers.Windows,
+                HotkeyModifiers.Control | HotkeyModifiers.Alt,
                 HotkeyKey.Escape)),
     ];
 }

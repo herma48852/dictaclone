@@ -8,6 +8,16 @@ namespace DictaClone.Infrastructure;
 
 internal static class SettingsDocumentCodec
 {
+    private static readonly HotkeyBinding LegacyDictationDefault = new(
+        HotkeyAction.Dictation,
+        new HotkeyChord(
+            HotkeyModifiers.Control | HotkeyModifiers.Windows,
+            HotkeyKey.Space));
+    private static readonly HotkeyBinding LegacyCancelDefault = new(
+        HotkeyAction.Cancel,
+        new HotkeyChord(
+            HotkeyModifiers.Control | HotkeyModifiers.Windows,
+            HotkeyKey.Escape));
     private static readonly JsonSerializerOptions CompactOptions =
         CreateOptions(writeIndented: false);
     private static readonly JsonSerializerOptions IndentedOptions =
@@ -23,6 +33,7 @@ internal static class SettingsDocumentCodec
         {
             1 => MigrateSchema1(document),
             2 => MigrateSchema2(document),
+            3 => MigrateSchema3(document),
             DictaCloneSettings.CurrentSchemaVersion =>
                 JsonSerializer.Deserialize<DictaCloneSettings>(
                     document.Span,
@@ -118,15 +129,52 @@ internal static class SettingsDocumentCodec
             DictaCloneSettings.Default.SmartEdit);
     }
 
+    private static DictaCloneSettings MigrateSchema3(
+        ReadOnlyMemory<byte> document)
+    {
+        Schema3Settings old =
+            JsonSerializer.Deserialize<Schema3Settings>(
+                document.Span,
+                CompactOptions) ?? throw new InvalidDataException(
+                "The schema v3 settings document is empty.");
+
+        return new(
+            DictaCloneSettings.CurrentSchemaVersion,
+            old.Audio,
+            old.Transcription,
+            old.Text,
+            old.Insertion,
+            MigrateLegacyDefaultHotkeys(old.Hotkeys),
+            old.Preferences,
+            old.SmartEdit);
+    }
+
     private static ImmutableArray<HotkeyBinding> MigrateHotkeys(
         ImmutableArray<HotkeyBinding> bindings)
     {
         HotkeyBinding safeSmartEditDefault = HotkeyDefaults.Bindings.Single(
             binding => binding.Action == HotkeyAction.SmartEdit);
-        return bindings.Select(binding =>
+        ImmutableArray<HotkeyBinding> smartEditSafe = bindings.Select(binding =>
             binding.Action == HotkeyAction.SmartEdit
                 ? safeSmartEditDefault
                 : binding).ToImmutableArray();
+        return MigrateLegacyDefaultHotkeys(smartEditSafe);
+    }
+
+    private static ImmutableArray<HotkeyBinding> MigrateLegacyDefaultHotkeys(
+        ImmutableArray<HotkeyBinding> bindings)
+    {
+        HotkeyBinding dictationDefault = HotkeyDefaults.Bindings.Single(
+            binding => binding.Action == HotkeyAction.Dictation);
+        HotkeyBinding cancelDefault = HotkeyDefaults.Bindings.Single(
+            binding => binding.Action == HotkeyAction.Cancel);
+
+        return bindings.Select(binding => binding switch
+        {
+            _ when binding == LegacyDictationDefault => dictationDefault,
+            _ when binding == LegacyCancelDefault => cancelDefault,
+            _ => binding,
+        }).ToImmutableArray();
     }
 
     private static JsonSerializerOptions CreateOptions(bool writeIndented)
@@ -168,4 +216,14 @@ internal static class SettingsDocumentCodec
         InsertionSettings Insertion,
         ImmutableArray<HotkeyBinding> Hotkeys,
         ApplicationPreferences Preferences);
+
+    private sealed record Schema3Settings(
+        int SchemaVersion,
+        AudioSettings Audio,
+        TranscriptionSettings Transcription,
+        TextProcessingSettings Text,
+        InsertionSettings Insertion,
+        ImmutableArray<HotkeyBinding> Hotkeys,
+        ApplicationPreferences Preferences,
+        SmartEditSettings SmartEdit);
 }

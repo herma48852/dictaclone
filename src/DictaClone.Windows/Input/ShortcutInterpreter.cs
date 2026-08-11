@@ -9,6 +9,7 @@ public sealed class ShortcutInterpreter
     private readonly BindingState[] _bindings;
     private readonly HashSet<PhysicalModifier> _pressedModifiers = [];
     private readonly HashSet<HotkeyKey> _pressedPrimaryKeys = [];
+    private readonly HashSet<HotkeyKey> _suppressedPrimaryKeys = [];
 
     public ShortcutInterpreter(IEnumerable<HotkeyBinding> bindings)
     {
@@ -19,9 +20,34 @@ public sealed class ShortcutInterpreter
             .ToArray();
     }
 
-    public ImmutableArray<HotkeyEvent> Process(RawInputEvent input)
+    public ImmutableArray<HotkeyEvent> Process(RawInputEvent input) =>
+        Process(input, out _);
+
+    internal ImmutableArray<HotkeyEvent> Process(
+        RawInputEvent input,
+        out bool suppressInput)
     {
-        if (input.IsInjected || !UpdatePressedControls(input))
+        suppressInput = false;
+        if (input.IsInjected)
+        {
+            return [];
+        }
+
+        HotkeyKey? inputPrimaryKey = input.Control.PrimaryKey;
+        if (inputPrimaryKey is { } primaryKey)
+        {
+            if (input.IsPressed && _suppressedPrimaryKeys.Contains(primaryKey))
+            {
+                suppressInput = true;
+            }
+            else if (!input.IsPressed &&
+                     _suppressedPrimaryKeys.Remove(primaryKey))
+            {
+                suppressInput = true;
+            }
+        }
+
+        if (!UpdatePressedControls(input))
         {
             return [];
         }
@@ -43,6 +69,15 @@ public sealed class ShortcutInterpreter
             }
 
             state.ChordWasDown = chordIsDown;
+            if (chordIsDown &&
+                input.IsPressed &&
+                inputPrimaryKey is { } suppressedPrimaryKey &&
+                inputPrimaryKey == state.Binding.Chord.PrimaryKey)
+            {
+                suppressInput = true;
+                _suppressedPrimaryKeys.Add(suppressedPrimaryKey);
+            }
+
             if (state.Binding.Activation == HotkeyActivation.Toggle)
             {
                 if (chordIsDown)
@@ -82,6 +117,7 @@ public sealed class ShortcutInterpreter
 
         _pressedModifiers.Clear();
         _pressedPrimaryKeys.Clear();
+        _suppressedPrimaryKeys.Clear();
         return events.ToImmutable();
     }
 

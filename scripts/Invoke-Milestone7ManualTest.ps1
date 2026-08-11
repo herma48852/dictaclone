@@ -59,7 +59,7 @@ with another DictaClone installation.
    - In the first-run window titled "DictaClone first-run setup", select the
      "Microphone" and "Local model" = base.en controls, then select "Apply
      settings". Under "Privacy & recovery", select "Complete setup".
-   - Open Notepad. Hold Ctrl+Win+Space, say "portable dictation works", release,
+   - Open Notepad. Hold Ctrl+Shift+Space, say "portable dictation works", release,
      allow the verified model download to finish, and confirm the text is
      inserted.
    - Exit using "Exit DictaClone" on the notification-area icon.
@@ -79,7 +79,7 @@ with another DictaClone installation.
    - Disconnect Wi-Fi/Ethernet.
    - Exit DictaClone with "Exit DictaClone", then launch "DictaClone" from the
      Start menu.
-   - Open Notepad. Hold Ctrl+Win+Space, say "offline restart works", release,
+   - Open Notepad. Hold Ctrl+Shift+Space, say "offline restart works", release,
      and confirm the text is inserted without network access.
    - Reconnect the network when finished.
 
@@ -96,7 +96,7 @@ with another DictaClone installation.
 5. Uninstall
    - Exit DictaClone.
    - Open Windows Settings > Apps > Installed apps, locate the complete app name
-     "DictaClone 0.1.0", choose its three-dot menu, and choose "Uninstall".
+     "DictaClone $version", choose its three-dot menu, and choose "Uninstall".
    - At "Delete DictaClone settings, downloaded speech models, transcript
      history, and diagnostics for this Windows user?", choose "No" for the
      retention test.

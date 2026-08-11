@@ -31,6 +31,56 @@ public sealed class TextInsertionServiceTests
         Assert.Equal(1, context.StaThreads.CallCount);
     }
 
+    [Theory]
+    [InlineData("WindowsTerminal", "CASCADIA_HOSTING_WINDOW_CLASS")]
+    [InlineData("windowsterminal", "unexpected-class")]
+    [InlineData("unexpected-process", "cascadia_hosting_window_class")]
+    public async Task WindowsTerminalPaste_UsesTerminalAccelerator(
+        string processName,
+        string windowClass)
+    {
+        var context = new TestContext();
+        context.Clipboard.Value = "original";
+        ForegroundTarget terminalTarget = LocalTarget with
+        {
+            ProcessName = processName,
+            WindowClass = windowClass,
+        };
+
+        await context.Service.InsertAsync(
+            "prompt text",
+            terminalTarget,
+            new(TextInsertionMode.Paste, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(
+            ["clipboard:TerminalPaste"],
+            context.Keyboard.Events);
+        Assert.Equal("original", context.Clipboard.Value);
+        Assert.Equal(1, context.Clipboard.RestoreCalls);
+    }
+
+    [Fact]
+    public async Task WindowsTerminalTyping_RemainsClipboardFree()
+    {
+        var context = new TestContext();
+        context.Keyboard.MappableCharacters.Add('A');
+        ForegroundTarget terminalTarget = LocalTarget with
+        {
+            ProcessName = "WindowsTerminal",
+            WindowClass = "CASCADIA_HOSTING_WINDOW_CLASS",
+        };
+
+        await context.Service.InsertAsync(
+            "A",
+            terminalTarget,
+            new(TextInsertionMode.DelayedTyping, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(["mapped:A"], context.Keyboard.Events);
+        Assert.Equal(0, context.Clipboard.TotalCalls);
+    }
+
     [Fact]
     [Trait("Category", "ReleaseStress")]
     public async Task FiftyConsecutivePasteTransactions_RestoreOwnedClipboard()

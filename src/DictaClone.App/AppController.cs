@@ -209,8 +209,8 @@ public sealed class AppController : IAsyncDisposable
         _trayIcon.ShowNotification(
             "DictaClone is running",
             warmed
-                ? "Hold Ctrl+Win+Space to start local dictation."
-                : "Hold Ctrl+Win+Space; the local model will be prepared on first use.");
+                ? "Hold Ctrl+Shift+Space to start local dictation."
+                : "Hold Ctrl+Shift+Space; the local model will be prepared on first use.");
 
         if (settingsLoad?.QuarantinedFilePath is not null)
         {

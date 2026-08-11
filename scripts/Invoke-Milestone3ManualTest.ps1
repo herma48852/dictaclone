@@ -39,7 +39,7 @@ $appProcess = Start-Process `
 Write-Output "DictaClone started with process ID $($appProcess.Id)."
 Write-Output @'
 Milestone 3 manual check:
-1. Hold Ctrl+Win+Space and speak a short sentence. The red Listening pill and
+1. Hold Ctrl+Shift+Space and speak a short sentence. The red Listening pill and
    live level meter should respond only while the chord is held.
 2. Release Space. The pill should show local transcription progress and then
    display the recognized text. Text insertion is Milestone 4 and is not

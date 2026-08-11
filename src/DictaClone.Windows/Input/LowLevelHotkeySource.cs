@@ -148,10 +148,14 @@ public sealed partial class LowLevelHotkeySource : IHotkeyEventSource
                         hookData.VirtualKey,
                         out RawInputControl control))
                 {
-                    Process(new(
+                    bool suppressInput = Process(new(
                         control,
                         WindowsInputMapper.IsPressedMessage(messageId),
                         (hookData.Flags & KeyboardInjectedFlag) != 0));
+                    if (suppressInput)
+                    {
+                        return 1;
+                    }
                 }
             }
         }
@@ -179,10 +183,14 @@ public sealed partial class LowLevelHotkeySource : IHotkeyEventSource
                         hookData.MouseData,
                         out RawInputControl control))
                 {
-                    Process(new(
+                    bool suppressInput = Process(new(
                         control,
                         WindowsInputMapper.IsPressedMessage(messageId),
                         (hookData.Flags & MouseInjectedFlag) != 0));
+                    if (suppressInput)
+                    {
+                        return 1;
+                    }
                 }
             }
         }
@@ -197,15 +205,17 @@ public sealed partial class LowLevelHotkeySource : IHotkeyEventSource
     private static bool IsKeyboardMessage(uint message) =>
         message is 0x0100 or 0x0101 or 0x0104 or 0x0105;
 
-    private void Process(RawInputEvent input)
+    private bool Process(RawInputEvent input)
     {
         ImmutableArray<HotkeyEvent> events;
+        bool suppressInput = false;
         lock (_sync)
         {
-            events = _interpreter?.Process(input) ?? [];
+            events = _interpreter?.Process(input, out suppressInput) ?? [];
         }
 
         Publish(events);
+        return suppressInput;
     }
 
     private void Publish(IEnumerable<HotkeyEvent> events)

@@ -8,9 +8,9 @@ public sealed class ProductInfoTests
     public void ProductName_IsStable()
     {
         Assert.Equal("DictaClone", ProductInfo.Name);
-        Assert.Equal(new Version(0, 1, 0), ProductInfo.DevelopmentVersion);
+        Assert.Equal(new Version(0, 1, 1), ProductInfo.DevelopmentVersion);
         Assert.Equal(
-            new Version(0, 1, 0, 0),
+            new Version(0, 1, 1, 0),
             typeof(ProductInfo).Assembly.GetName().Version);
     }
 

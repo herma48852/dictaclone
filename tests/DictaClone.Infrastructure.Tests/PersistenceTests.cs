@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
 using DictaClone.Core.Contracts;
+using DictaClone.Core.Hotkeys;
 using DictaClone.Core.Settings;
 using DictaClone.Infrastructure;
 
@@ -56,7 +57,7 @@ public sealed class PersistenceTests
     }
 
     [Fact]
-    public async Task Schema1_IsMigratedAndRewrittenAsSchema3()
+    public async Task Schema1_IsMigratedAndRewrittenAsSchema4()
     {
         using var directory = new TemporaryDirectory();
         var transfer = new SettingsTransferService();
@@ -98,7 +99,7 @@ public sealed class PersistenceTests
         Assert.False(loaded.Settings.Preferences.HistoryEnabled);
         string rewritten = await File.ReadAllTextAsync(
             directory.Paths.SettingsFile);
-        Assert.Contains("\"schemaVersion\": 3", rewritten);
+        Assert.Contains("\"schemaVersion\": 4", rewritten);
         Assert.False(loaded.Settings.SmartEdit.Enabled);
     }
 
@@ -142,8 +143,82 @@ public sealed class PersistenceTests
             loaded.Settings.Hotkeys.Single(binding =>
                 binding.Action ==
                     DictaClone.Core.Hotkeys.HotkeyAction.SmartEdit).Chord);
-        Assert.Contains("\"schemaVersion\": 3",
+        Assert.Contains("\"schemaVersion\": 4",
             await File.ReadAllTextAsync(directory.Paths.SettingsFile));
+    }
+
+    [Fact]
+    public async Task Schema3_DefaultWindowsHotkeys_AreMigrated()
+    {
+        using var directory = new TemporaryDirectory();
+        var transfer = new SettingsTransferService();
+        string seedPath = Path.Combine(directory.Root, "seed-v3.json");
+        await transfer.ExportAsync(
+            seedPath,
+            DictaCloneSettings.Default,
+            CancellationToken.None);
+        JsonObject document = JsonNode.Parse(
+            await File.ReadAllTextAsync(seedPath))!.AsObject();
+        document["schemaVersion"] = 3;
+        JsonArray hotkeys = document["hotkeys"]!.AsArray();
+        SetChordModifiers(hotkeys, "dictation", "control, windows");
+        SetChordModifiers(hotkeys, "cancel", "control, windows");
+        await File.WriteAllTextAsync(
+            directory.Paths.SettingsFile,
+            document.ToJsonString());
+        using var store = new JsonSettingsStore(directory.Paths);
+
+        SettingsLoadResult loaded = await store.LoadAsync(
+            CancellationToken.None);
+
+        Assert.True(loaded.WasMigrated);
+        Assert.Equal(
+            HotkeyDefaults.Bindings.Single(binding =>
+                binding.Action == HotkeyAction.Dictation),
+            loaded.Settings.Hotkeys.Single(binding =>
+                binding.Action == HotkeyAction.Dictation));
+        Assert.Equal(
+            HotkeyDefaults.Bindings.Single(binding =>
+                binding.Action == HotkeyAction.Cancel),
+            loaded.Settings.Hotkeys.Single(binding =>
+                binding.Action == HotkeyAction.Cancel));
+        Assert.Contains(
+            "\"schemaVersion\": 4",
+            await File.ReadAllTextAsync(directory.Paths.SettingsFile));
+    }
+
+    [Fact]
+    public async Task Schema3_CustomizedWindowsHotkey_IsPreserved()
+    {
+        using var directory = new TemporaryDirectory();
+        var transfer = new SettingsTransferService();
+        string seedPath = Path.Combine(directory.Root, "custom-v3.json");
+        await transfer.ExportAsync(
+            seedPath,
+            DictaCloneSettings.Default,
+            CancellationToken.None);
+        JsonObject document = JsonNode.Parse(
+            await File.ReadAllTextAsync(seedPath))!.AsObject();
+        document["schemaVersion"] = 3;
+        JsonArray hotkeys = document["hotkeys"]!.AsArray();
+        JsonObject dictation = FindHotkey(hotkeys, "dictation");
+        dictation["chord"]!["modifiers"] = "control, windows";
+        dictation["chord"]!["primaryKey"] = "f13";
+        await File.WriteAllTextAsync(
+            directory.Paths.SettingsFile,
+            document.ToJsonString());
+        using var store = new JsonSettingsStore(directory.Paths);
+
+        SettingsLoadResult loaded = await store.LoadAsync(
+            CancellationToken.None);
+
+        HotkeyBinding migrated = loaded.Settings.Hotkeys.Single(binding =>
+            binding.Action == HotkeyAction.Dictation);
+        Assert.Equal(
+            new HotkeyChord(
+                HotkeyModifiers.Control | HotkeyModifiers.Windows,
+                HotkeyKey.F13),
+            migrated.Chord);
     }
 
     [Fact]
@@ -428,4 +503,15 @@ public sealed class PersistenceTests
             }
         }
     }
+
+    private static void SetChordModifiers(
+        JsonArray hotkeys,
+        string action,
+        string modifiers) =>
+        FindHotkey(hotkeys, action)["chord"]!["modifiers"] = modifiers;
+
+    private static JsonObject FindHotkey(JsonArray hotkeys, string action) =>
+        hotkeys
+            .Select(node => node!.AsObject())
+            .Single(binding => binding["action"]!.GetValue<string>() == action);
 }

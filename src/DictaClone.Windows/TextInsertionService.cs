@@ -100,7 +100,9 @@ public sealed class TextInsertionService : ITextInsertionService
             TextInsertionMode.Paste => _staThreads.RunAsync(
                 () => InsertWithClipboard(
                     text,
-                    ClipboardInsertionShortcut.StandardPaste,
+                    WindowsTerminalTargetDetector.IsWindowsTerminal(target)
+                        ? ClipboardInsertionShortcut.TerminalPaste
+                        : ClipboardInsertionShortcut.StandardPaste,
                     cancellationToken),
                 cancellationToken),
             TextInsertionMode.DelayedTyping => TypeAsync(
@@ -266,6 +268,22 @@ internal static class EmacsTargetDetector
             StringComparison.OrdinalIgnoreCase);
 }
 
+internal static class WindowsTerminalTargetDetector
+{
+    private const string ProcessName = "WindowsTerminal";
+    private const string WindowClass = "CASCADIA_HOSTING_WINDOW_CLASS";
+
+    public static bool IsWindowsTerminal(ForegroundTarget target) =>
+        string.Equals(
+            target.ProcessName,
+            ProcessName,
+            StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(
+            target.WindowClass,
+            WindowClass,
+            StringComparison.OrdinalIgnoreCase);
+}
+
 internal static class TextInputPlanner
 {
     public static IReadOnlyList<TextInputToken> Tokenize(string text)
@@ -330,6 +348,7 @@ internal enum VirtualKey : ushort
 internal enum ClipboardInsertionShortcut
 {
     StandardPaste,
+    TerminalPaste,
     EmacsYank,
 }
 

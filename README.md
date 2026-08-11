@@ -13,10 +13,12 @@ remain local unless the user explicitly configures a cloud provider.
 
 Milestones 0 through 6 are implemented and accepted. The tray app captures the
 microphone, transcribes locally, and inserts into the original foreground target
-through sequence-safe Paste Mode or normally clipboard-free Typing Mode. Native
-GNU Emacs uses a clipboard-preserving `Ctrl+Y` compatibility path because its
-standard key map does not paste with `Ctrl+V` and did not accept DictaClone's
-synthetic character stream. Milestone 5 persistence, recovery, knowledge,
+through sequence-safe Paste Mode or normally clipboard-free Typing Mode.
+Windows Terminal targets, including Codex CLI, use the terminal's
+`Ctrl+Shift+V` paste path. Native GNU Emacs uses a clipboard-preserving
+`Ctrl+Y` compatibility path because its standard key map does not paste with
+`Ctrl+V` and did not accept DictaClone's synthetic character stream. Milestone
+5 persistence, recovery, knowledge,
 diagnostics, and desktop polish is accepted. Milestone 6 Smart Edit and
 selected-text editing is accepted. Its cloud path is off by default, keeps
 provider keys in Windows Credential Manager, and revalidates the foreground
@@ -25,10 +27,12 @@ implemented and its automated release qualification passes. Manual installer,
 portable, offline-restart, and uninstall acceptance is deferred until testing
 can be performed on a new Windows 11 x64 laptop.
 
-The default dictation trigger is `Ctrl+Win+Space`; the primary key prevents
-Windows' `Ctrl+Win+Arrow` virtual-desktop shortcuts from starting a recording.
-Milestone 4 adds focus-safe clipboard paste and delayed typing into the
-original foreground application.
+The default dictation trigger is `Ctrl+Shift+Space`. DictaClone consumes the
+recognized shortcut's primary key so it does not execute a command in the
+foreground application. Existing exact default `Ctrl+Win+Space` bindings are
+migrated automatically; customized bindings are preserved. Milestone 4 adds
+focus-safe clipboard paste and delayed typing into the original foreground
+application.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the proposed
 architecture, milestones, unit and regression tests, privacy constraints, and
@@ -148,8 +152,8 @@ manual review with:
 .\scripts\Invoke-Milestone7ManualTest.ps1
 ```
 
-For clean-room testing of version 0.1.0, open the
-[GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.0),
+For clean-room testing of version 0.1.1, open the
+[GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.1),
 expand **Assets**, and download the installer, the specifically named portable
 ZIP, `CLEAN_ROOM_INSTALLATION.md`, `release-manifest.json`, and
 `SHA256SUMS.txt` into one folder. Do not use GitHub's automatically generated
@@ -158,12 +162,12 @@ for checksum verification, installation, and ordinary use.
 
 As an offline alternative, transfer the complete
 `artifacts\release\<version>` directory from the trusted build machine. For the
-complete acceptance review, clone tag `v0.1.0` on the clean test machine and
+complete acceptance review, clone tag `v0.1.1` on the clean test machine and
 pass the full path of the downloaded or transferred release folder explicitly:
 
 ```powershell
 .\scripts\Invoke-Milestone7ManualTest.ps1 `
-    -ReleaseDirectory 'D:\DictaClone-0.1.0'
+    -ReleaseDirectory 'D:\DictaClone-0.1.1'
 ```
 
 Leave the keyboard, mouse, clipboard, and foreground window untouched while
