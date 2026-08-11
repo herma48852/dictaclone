@@ -1,154 +1,321 @@
-# DictaClone macOS Porting Guide
+# DictaClone macOS porting guide
 
-## Purpose
+Last reviewed: August 11, 2026
 
-DictaClone currently uses WPF for its Windows desktop shell. WPF cannot run on macOS; although .NET is cross-platform, Microsoft defines WPF as Windows-only. See the [Microsoft WPF overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/).
+## Current decision and status
 
-The macOS port should preserve the shared dictation workflow while replacing the UI and operating-system integrations. The preferred approach is:
+The macOS port uses .NET 10, Avalonia 12.1, and native Apple adapters. It keeps
+the accepted dictation, transcription, text-processing, persistence, history,
+diagnostics, and Smart Edit workflow in shared C# projects. WPF and Win32 remain
+the Windows shell and platform layer; Avalonia, AppKit, Core Foundation, Core
+Graphics, Core Audio, Accessibility, and Keychain Services provide the macOS
+shell and integrations.
 
-1. Keep reusable application logic in C#/.NET.
-2. Use Avalonia for UI that should be shared between Windows and macOS.
-3. Implement microphone, hotkey, foreground-target, clipboard, text-insertion, and permission behavior behind platform-specific adapters.
-4. Use native Apple APIs where reliable desktop integration requires them.
+The implementation now includes every planned engineering milestone:
 
-## Recommended architecture
+1. Shared input models, shortcut interpretation, presentation controllers, and
+   platform-neutral error contracts are extracted from Windows-only assemblies.
+2. An Avalonia menu-bar app supplies settings, history, status, first-run, and
+   shutdown behavior without showing a Dock icon.
+3. Native macOS implementations cover microphone capture and discovery, global
+   hotkeys, foreground-target capture, selected-text capture, pasteboard-safe
+   paste, delayed typing, permissions, Keychain secrets, start at login, and
+   single-instance enforcement.
+4. Apple Silicon and Intel self-contained bundle creation, hardened-runtime
+   signing, notarization, stapling, checksums, and smoke verification are
+   scripted.
+5. Adapter tests and a native permission/device probe are present.
+
+The local development qualification now passes with repository-pinned .NET SDK
+10.0.302 and Xcode 26.6 (17F113). The Avalonia app builds without warnings, both
+`osx-arm64` and `osx-x64` self-contained bundles publish and validate, and both
+packaged executables pass their non-UI smoke test (the Intel check uses Rosetta
+on the Apple-silicon build host). The adapter test assembly also builds without
+warnings. On August 11, 2026, all cross-platform and macOS automated suites
+passed from `scripts/macos/test.sh` in a normal Terminal session. The same day,
+an Apple-Development-signed, hardened-runtime `osx-arm64` bundle completed the
+primary interactive path on Apple Silicon: LaunchServices bundle launch,
+Microphone and Accessibility authorization, the `Control+Shift+Space` global
+shortcut, live microphone capture, local transcription, and Paste Mode
+insertion into TextEdit and native GNU Emacs. DictaClone also transcribed text
+entered into the project's live development session. The broader
+denial/revocation, offline, lifecycle, insertion-mode, application, and Intel
+portions of the acceptance matrix remain. Developer ID signing and Apple
+notarization additionally require the release owner's distribution certificate
+and notary profile.
+
+## Supported target
+
+- macOS 14 Sonoma or newer.
+- Apple Silicon (`osx-arm64`) and Intel (`osx-x64`).
+- .NET 10 self-contained application bundles; end users do not install .NET.
+- Avalonia 12.1.0 desktop UI.
+- Whisper.net 1.9.1 with the Core ML runtime package on macOS.
+
+Avalonia 12 requires .NET 10. Its current platform policy lists macOS 26 as
+Tier 1 and macOS 14 and 15 as Tier 2. The app bundle deliberately sets macOS 14
+as its deployment floor so it follows the .NET 10 supported-OS range while
+remaining usable on the two earlier supported macOS releases.
+
+## Architecture
 
 ```text
-Shared .NET code
-├── dictation workflow and state
-├── transcription orchestration
-├── text processing
-├── settings models
-└── platform-neutral interfaces
+Shared .NET 10
+├── DictaClone.Core             workflow contracts, settings, hotkeys
+├── DictaClone.Desktop          reusable presentation/controller behavior
+├── DictaClone.Speech           Whisper model management and transcription
+├── DictaClone.Text             deterministic text processing
+└── DictaClone.Infrastructure   settings, history, diagnostics, Smart Edit
 
-Platform implementations
-├── Windows
-│   ├── WPF application shell
-│   ├── Win32 foreground target and hotkeys
-│   ├── WASAPI/NAudio microphone capture
-│   └── Windows clipboard and SendInput
-└── macOS
-    ├── Avalonia UI with AppKit interop
-    ├── macOS foreground target and global hotkeys
-    ├── AVAudioEngine/Core Audio microphone capture
-    └── NSPasteboard, CGEvent, and Accessibility APIs
+Windows                             macOS
+├── DictaClone.App (WPF)            ├── DictaClone.Mac.App (Avalonia/AppKit)
+├── DictaClone.Windows (Win32)      └── DictaClone.Mac (native Apple adapters)
+└── DictaClone.Audio (NAudio)
 ```
 
-WPF, Win32 handles, Windows Forms clipboard types, and other Windows-only types must not leak into shared projects. Shared code should depend only on interfaces and platform-neutral models.
+Windows-only types must not enter `DictaClone.Core` or `DictaClone.Desktop`.
+Platform target identifiers remain opaque to shared code, and all mutations
+flow through the existing contracts.
 
-## UI framework choices
+## Windows-to-macOS implementation map
 
-### Recommended: Avalonia with native macOS adapters
+| Capability | Windows | Implemented macOS replacement |
+| --- | --- | --- |
+| Settings/history UI | WPF | Avalonia Fluent windows |
+| Tray/menu UI | notification-area icon | Avalonia `TrayIcon`/native menu |
+| Floating status | nonactivating WPF window | nonactivating Avalonia window |
+| Global hotkeys | low-level Win32 hook | `CGEventTap` on a background CFRunLoop |
+| Microphone | NAudio/WASAPI | Core Audio Audio Queue input |
+| Device enumeration | MMDevice | Core Audio AudioObject APIs |
+| Foreground target | Win32 window/process identity | `NSWorkspace` PID plus focused `AXUIElement` identity |
+| Selected text | UI Automation | Accessibility selected-text attribute |
+| Paste Mode | Windows clipboard and `SendInput` | full-format `NSPasteboard` snapshot plus `CGEvent` Command-V |
+| Typing Mode | Unicode `SendInput` | Unicode `CGEvent` keyboard events by grapheme |
+| API-key storage | Windows Credential Manager | login Keychain via `/usr/bin/security` |
+| Start at login | current-user Run key | per-user LaunchAgent |
+| Packaging | EXE/portable ZIP | signed and notarized `.app` ZIP |
 
-[Avalonia](https://docs.avaloniaui.net/docs/welcome) is a cross-platform .NET UI framework that supports Windows and macOS, including Apple Silicon and Intel. Its C#, XAML, data-binding, and view-model concepts are similar to WPF, making it the most direct route to retaining the existing .NET code and development model. Avalonia documents the important differences in its [WPF migration guide](https://docs.avaloniaui.net/docs/migration/wpf/).
+The macOS implementation uses direct native interop rather than binding an
+additional AppKit package. This keeps the native boundary small and allows the
+adapter tests to substitute in-memory pasteboard, target, keyboard, audio, and
+process collaborators. A minimal Objective-C shim, compiled for the target
+architecture by Xcode during packaging, bridges AVFoundation's block-based
+microphone-consent callback into the managed permission service.
 
-Avalonia can replace settings windows, status displays, and other visible controls. It does not replace platform-specific features such as `SendInput`, WASAPI, or foreground-window detection; these still require native macOS implementations.
+## Permissions and privacy
 
-### Native alternative: SwiftUI and AppKit
+DictaClone exposes three macOS permission states separately:
 
-The most native option is a SwiftUI application with AppKit integration. SwiftUI can implement settings and standard windows, while AppKit supplies desktop-specific facilities such as [`NSStatusItem`](https://developer.apple.com/documentation/appkit/nsstatusitem) for a menu-bar item.
+- **Microphone** is required for recording.
+- **Accessibility** is required to identify the focused control, capture an
+  exact selection, and validate the insertion target.
+- **Input Monitoring** is reported for diagnostics but is not separately
+  required once Accessibility is authorized. Accessibility grants the active
+  event tap the listening and posting access DictaClone needs.
 
-This option provides the closest macOS look, behavior, and platform integration, but requires a substantially larger Swift rewrite or a maintained boundary between a Swift shell and the shared .NET engine.
+The settings window refreshes each state when it becomes active. Its Microphone
+button makes the AVFoundation consent request that registers DictaClone with
+macOS; if access was already denied, it opens **System Settings > Privacy &
+Security > Microphone** for manual recovery. The Accessibility and Input
+Monitoring buttons use the corresponding Apple request APIs before opening
+their matching system controls. Permission
+failures are actionable platform errors, not generic audio or insertion
+failures. Prompts are requested only from explicit settings actions; the
+application does not loop permission requests.
 
-### Why .NET MAUI is not the first choice
+Ordinary dictation remains local. Models and settings are stored under
+`~/Library/Application Support/DictaClone`. Optional transcript history is off
+by default. Smart Edit is off by default, makes a network request only after
+explicit configuration, and stores its API key in the user's login Keychain as
+service `com.dictaclone.desktop`.
 
-.NET MAUI supports macOS through Mac Catalyst, as described in [Microsoft's supported-platform documentation](https://learn.microsoft.com/en-us/dotnet/maui/supported-platforms). That is attractive when sharing an application with iOS, but DictaClone is primarily a desktop utility that depends on menu-bar behavior, global shortcuts, accessibility permissions, and interaction with other desktop applications. Avalonia with native adapters, or a native SwiftUI/AppKit shell, is a better fit.
+## Input and insertion safety
 
-## Windows-to-macOS mapping
+The shared shortcut model retains its serialized modifier names for settings
+compatibility. The macOS UI renders them as Control, Option, Shift, and Command;
+the existing `Windows` modifier bit means Command on macOS. Defaults are:
 
-| DictaClone capability | Windows implementation | macOS replacement |
-|---|---|---|
-| Settings and status UI | WPF | Avalonia or SwiftUI |
-| System-tray/menu icon | Windows notification area | AppKit `NSStatusItem` |
-| Floating status pill | WPF window | Avalonia window or AppKit floating panel |
-| Global hotkey | Win32 keyboard hook or hotkey registration | macOS global hotkey/event-tap API |
-| Microphone capture | NAudio/WASAPI | AVAudioEngine/Core Audio |
-| Foreground-app detection | Win32 foreground-window APIs | NSWorkspace and Accessibility APIs |
-| Paste Mode | Windows clipboard | `NSPasteboard` |
-| Typing Mode | Win32 `SendInput` | `CGEvent` and Accessibility APIs |
-| Elevated-target protection | Windows process integrity levels | macOS permission and target-access checks |
-| Application packaging | Windows executable/installer | Signed and notarized `.app` bundle |
+| Action | Shortcut | Activation |
+| --- | --- | --- |
+| Dictation | Control+Shift+Space | hold |
+| Typing Mode | Control+Option+Space | hold |
+| Cancel | Control+Option+Escape | press |
+| Smart Edit | Option+Shift+Space | disabled until configured |
 
-Apple's [`AXUIElement`](https://developer.apple.com/documentation/applicationservices/axuielement_h?changes=latest_ma_2) APIs allow assistive applications to inspect and interact with other applications' accessible UI elements. DictaClone's macOS foreground-target and insertion adapters will need to handle applications that expose incomplete accessibility information or temporarily reject requests.
+The event tap ignores DictaClone's own synthetic keyboard events and suppresses
+the primary key of a recognized shortcut so it does not leak into the target.
 
-## macOS permissions
+Paste Mode captures the target before recording and revalidates it before
+insertion. It snapshots every pasteboard item and type as binary data, writes
+the result, sends Command-V, and restores the snapshot only while DictaClone
+still owns the pasteboard transaction. A concurrent user or application change
+is never overwritten. Temporary pasteboard failures use bounded retries.
 
-The application should request permissions only when the associated feature is first needed and provide clear recovery instructions when access is denied.
+Typing Mode never reads or changes the pasteboard. It sends Unicode by composed
+grapheme so emoji and combining characters are not split, maps newlines and tabs
+to their keys, honors the configured delay, and reports blocked input as a
+permission failure.
 
-Expected permission areas include:
+## Audio and transcription
 
-- Microphone access for recording speech.
-- Accessibility access for inspecting the active control and inserting text where required.
-- Input Monitoring if the selected global-hotkey implementation requires it.
+`MacAudioCaptureService` uses an Audio Queue configured for 16 kHz, mono,
+signed 16-bit PCM, matching the shared transcription contract. It implements
+level reporting, cancellation, silence metrics, maximum duration, buffer
+cleanup, and optional device selection. The device service always offers
+**Follow system default microphone**, then enumerates physical input devices
+through Core Audio.
 
-Permission state must be treated as an explicit application condition, not as a generic insertion or recording failure. Automated logic should never repeatedly trigger system permission prompts.
+The macOS app references `Whisper.net.Runtime.CoreML`. Whisper.net selects the
+available native runtime and can use Core ML acceleration on supported Macs.
+The existing verified model downloader and hash checks are shared unchanged.
 
-## Shared interface boundaries
+## User interface and lifecycle
 
-The existing platform-neutral contracts should remain the seam for a future macOS implementation. At minimum, platform-specific services should be isolated behind interfaces for:
+The app is an agent-style menu-bar application (`LSUIElement`) and normally has
+no Dock icon. The menu exposes dictation state, settings, history, copy-last,
+and exit. Settings include microphone/model/language, insertion mode and delay,
+all shortcuts, vocabulary, expansions, domain, history, start at login,
+permissions, import/export, diagnostics/support bundle creation, and Smart Edit.
 
-- Audio capture and device enumeration.
-- Global-hotkey registration.
-- Foreground-target capture and revalidation.
-- Clipboard transactions.
-- Keyboard/text insertion.
-- Tray or menu-bar commands.
-- Status presentation.
-- Permission inspection and guidance.
+A per-user single-instance guard prevents two copies from competing for the
+event tap or pasteboard. Enabling start at login writes
+`~/Library/LaunchAgents/com.dictaclone.desktop.plist`; disabling it removes only
+that registration. Shutdown stops the hotkey loop and active workflow before
+disposing native and persistence resources.
 
-Foreground targets should be represented by opaque platform identifiers. Shared code should compare identities through the platform service rather than interpreting a Windows handle or macOS accessibility object.
+## Build and developer checks
 
-## Text-insertion behavior
+Install the prerequisites once:
 
-The macOS version should preserve the same safety properties as Windows:
+```zsh
+brew install --cask dotnet-sdk
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+dotnet --version   # must resolve 10.0.302 with this repository's global.json
+xcodebuild -version
+```
 
-### Paste Mode
+Then restore and run the cross-platform and macOS suites:
 
-- Capture the intended target before recording begins.
-- Revalidate the target immediately before insertion.
-- Preserve all practical clipboard formats, not only plain text.
-- Use bounded retries for temporary pasteboard contention.
-- Restore the clipboard only if DictaClone still owns the clipboard transaction.
-- Never overwrite a clipboard change made by the user or another application.
+```zsh
+./scripts/macos/test.sh
+```
 
-### Typing Mode
+Inspect permission and microphone discovery without launching the full shell:
 
-- Do not read or modify the clipboard.
-- Preserve Unicode text, emoji, line endings, and tabs.
-- Apply the configured per-character delay.
-- Report denied Accessibility or Input Monitoring permission as an actionable error.
+```zsh
+dotnet run --project tools/DictaClone.MacProbe
+dotnet run --project tools/DictaClone.MacProbe -- --capture-seconds 3
+```
 
-## Testing strategy
+The first command does not request permissions. The capture command exercises
+the real microphone path and may trigger the system consent flow.
 
-Most shared unit and workflow tests should run unchanged on both operating systems. Each platform adapter then needs its own unit and integration tests.
+Build and verify a development bundle for the current or named architecture:
 
-The macOS test suite should include:
+```zsh
+./scripts/macos/build-app.sh
+./scripts/macos/build-app.sh osx-x64
+./scripts/macos/verify-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
+```
 
-- Foreground-target capture and changed-target rejection.
-- Pasteboard preservation and concurrent-change handling.
-- Unicode, emoji, multiline, punctuation, and long-text insertion.
-- Typing Mode verification that the pasteboard is untouched.
-- Temporary pasteboard contention and bounded retry behavior.
-- Missing and denied permission states.
-- Microphone start, cancellation, completion, and device-loss behavior.
-- Hotkey press, hold, release, and collision behavior.
-- Real insertion targets such as TextEdit, a browser field, Terminal, and a dedicated test application.
-- Apple Silicon and Intel validation where both architectures remain supported.
+With no identity configured, `build-app.sh` uses an ad-hoc signature for local
+testing. Because an ad-hoc signature's designated requirement is its changing
+code hash, macOS privacy toggles from an earlier development build may look
+enabled while applying only to that older build. Reset and grant the three
+permissions once after creating the final qualification bundle, then do not
+rebuild it during the manual matrix. Direct distribution requires a
+**Developer ID Application** identity
+and an Apple notary profile:
 
-Signing, hardened-runtime, sandbox, and notarization checks should be included in release regression testing because development builds can behave differently from distributed applications.
+For stable local TCC qualification, an Apple Development identity can be used
+without a secure timestamp:
 
-## Suggested port sequence
+```zsh
+export DICTACLONE_CODESIGN_IDENTITY='Apple Development: Example (TEAMID)'
+./scripts/macos/build-app.sh osx-arm64
+```
 
-1. Keep the current Windows implementation stable and enforce platform boundaries with tests.
-2. Move reusable view models and presentation state out of the WPF project.
-3. Prototype an Avalonia settings window and status surface on Windows and macOS.
-4. Implement macOS menu-bar and global-hotkey adapters.
-5. Implement Core Audio microphone capture.
-6. Implement foreground-target tracking and permission diagnostics.
-7. Implement and regression-test Paste Mode and Typing Mode.
-8. Add signed and notarized macOS packaging.
-9. Run the full application corpus against common native, browser, terminal, and remote-desktop targets.
+```zsh
+export DICTACLONE_CODESIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
+xcrun notarytool store-credentials DictaCloneNotary
+export DICTACLONE_NOTARY_PROFILE='DictaCloneNotary'
+./scripts/macos/build-app.sh osx-arm64
+./scripts/macos/notarize-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
+./scripts/macos/verify-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
+```
 
-## Current project guidance
+`sign-app.sh` signs nested Mach-O files from the inside out and intentionally
+does not use `codesign --deep`. The final app is signed with the hardened
+runtime and a minimal entitlement set: CoreCLR JIT execution and microphone
+input. It does not carry `get-task-allow`, allow arbitrary unsigned executable
+memory, disable library validation, or enable App Sandbox. `notarize-app.sh`
+submits with `notarytool`, waits,
+staples the ticket, and validates it. The release command builds both
+architectures and creates a combined checksum file. When both release
+environment variables shown above are set, it also notarizes, staples, and
+repackages each architecture before calculating the final checksums:
 
-The current separation among `DictaClone.Core`, `DictaClone.Windows`, and the WPF application shell is aligned with this plan. New Windows functionality should continue to enter the shared workflow through interfaces rather than direct WPF or Win32 dependencies. This will allow the macOS port to replace adapters one at a time without rewriting the dictation workflow.
+```zsh
+./scripts/macos/new-release.sh
+```
+
+## Final acceptance matrix
+
+Automated adapter coverage includes shortcut mapping, target-change rejection,
+selection identity, full-format pasteboard restoration, concurrent clipboard
+change preservation, grapheme typing, audio lifecycle, LaunchAgent content,
+and Keychain command construction. Release acceptance additionally requires
+the following manual checks on a normal signed build:
+
+- Fresh user profile installation and all three deny/grant/revoke permission
+  paths.
+- Hold/release/repeat/cancel shortcut behavior and collision handling.
+- Microphone capture, device changes, cancellation, silence, and first model
+  download followed by an offline restart.
+- Paste and Typing Mode in TextEdit, browser fields, Terminal, and common rich
+  text editors, including emoji, combining text, multiline text, and tabs.
+- Changed-target and changed-selection rejection.
+- Clipboard preservation, including rich formats and a concurrent external
+  clipboard write.
+- Smart Edit disabled/offline behavior and an explicitly authorized provider
+  test.
+- Start-at-login enable/disable, single-instance handling, clean shutdown, data
+  retention, and full removal.
+- Apple Silicon and Intel launch, signature, Gatekeeper, notarization, and
+  stapling checks.
+
+Follow `MACOS_CLEAN_ROOM_INSTALLATION.md` for the end-user acceptance run.
+
+### Interactive qualification recorded August 11, 2026
+
+The Apple Silicon qualification build used the stable designated requirement
+from an Apple Development certificate, the hardened runtime, and the packaged
+JIT and audio-input entitlements. After one TCC reset for
+`com.dictaclone.desktop`, macOS reported Microphone and Accessibility as
+authorized. Input Monitoring remained optional. Holding and releasing the
+default shortcut transcribed speech locally and inserted the result into
+TextEdit and native GNU Emacs without the earlier repeated permission-failure
+sound.
+
+This accepts the primary end-to-end path, not the entire matrix above. In
+particular, Typing Mode, cancellation, target changes, permission revocation,
+clipboard concurrency, browser and Terminal fields, rich-text behavior,
+offline restart, login-item behavior, Intel hardware, Developer ID, Gatekeeper,
+and notarization still need their listed acceptance runs.
+
+## Milestone record
+
+| Milestone | State | Evidence or remaining gate |
+| --- | --- | --- |
+| 0: boundary and toolchain decision | Implemented | Avalonia/native adapter architecture and pinned packages |
+| 1: shared extraction | Implemented | `DictaClone.Desktop`, shared input/error contracts, cross-platform paths |
+| 2: shell and lifecycle | Implemented | menu-bar app, settings, history, overlay, first run, single instance |
+| 3: hotkeys, permissions, foreground | Implemented; primary path accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; denial/revocation and target-change matrix remains |
+| 4: audio and local speech | Implemented; primary path accepted on Apple Silicon | live Core Audio capture and local transcription succeeded; device, silence, cancellation, offline-restart, and Intel checks remain |
+| 5: safe insertion and selected text | Implemented; TextEdit and Emacs Paste Mode accepted | transcribed text inserted into the original TextEdit and native GNU Emacs targets; Typing Mode, other targets, clipboard concurrency, and selected-text matrix remains |
+| 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |
+| 7: packaging and release | Implemented; development-signed Apple Silicon path accepted; distribution acceptance pending | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle installed and launched successfully; Developer ID, Gatekeeper, notarization, Intel hardware, and the remaining manual matrix remain |
+
+No Windows behavior is intentionally removed by this port. The Windows WPF app
+now references the extracted desktop presentation assembly, while its Win32 and
+NAudio implementations stay in place.

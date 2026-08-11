@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>osx-arm64;osx-x64</RuntimeIdentifiers>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DictaClone.Core/DictaClone.Core.csproj" />
+    <ProjectReference Include="../DictaClone.Desktop/DictaClone.Desktop.csproj" />
+    <ProjectReference Include="../DictaClone.Infrastructure/DictaClone.Infrastructure.csproj" />
+    <ProjectReference Include="../DictaClone.Mac/DictaClone.Mac.csproj" />
+    <ProjectReference Include="../DictaClone.Speech/DictaClone.Speech.csproj" />
+    <ProjectReference Include="../DictaClone.Text/DictaClone.Text.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Whisper.net.Runtime.CoreML" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+    <None Include="../../legal/THIRD-PARTY-NOTICES.md"
+          Link="THIRD-PARTY-NOTICES.md"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../legal/MODEL-LICENSES.md"
+          Link="MODEL-LICENSES.md"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/MACOS_CLEAN_ROOM_INSTALLATION.md"
+          Link="MACOS_CLEAN_ROOM_INSTALLATION.md"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

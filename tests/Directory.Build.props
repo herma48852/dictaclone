@@ -8,7 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'DictaClone.TestTarget'">
-    <PackageReference Include="coverlet.collector">
+    <PackageReference Include="coverlet.collector"
+                      Condition="'$(DisableCoverageCollector)' != 'true'">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

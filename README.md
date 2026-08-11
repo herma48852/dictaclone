@@ -1,25 +1,26 @@
 # DictaClone
 
-DictaClone is a local-first voice-to-text application under development for
-Windows 11 x64. Its target workflow is simple: hold a global shortcut, speak,
-release it, and insert the transcription wherever the text cursor is active.
+DictaClone is a local-first voice-to-text application for Windows 11 x64 with a
+macOS 14+ port now in qualification. Its workflow is simple: hold a global
+shortcut, speak, release it, and insert the transcription wherever the text
+cursor is active.
 
-The project will provide local Whisper transcription, a Windows tray interface,
+The project provides local Whisper transcription, a tray or menu-bar interface,
 configurable shortcuts, clipboard and character-by-character insertion modes,
-custom vocabulary, and optional Smart Edit features. Audio and transcripts will
+custom vocabulary, and optional Smart Edit features. Audio and transcripts
 remain local unless the user explicitly configures a cloud provider.
 
 ## Project status
 
-Milestones 0 through 6 are implemented and accepted. The tray app captures the
+Windows Milestones 0 through 6 are implemented and accepted. The tray app captures the
 microphone, transcribes locally, and inserts into the original foreground target
 through sequence-safe Paste Mode or normally clipboard-free Typing Mode.
 Windows Terminal targets, including Codex CLI, use the terminal's
 `Ctrl+Shift+V` paste path. Native GNU Emacs uses a clipboard-preserving
 `Ctrl+Y` compatibility path because its standard key map does not paste with
 `Ctrl+V` and did not accept DictaClone's synthetic character stream. Milestone
-5 persistence, recovery, knowledge,
-diagnostics, and desktop polish is accepted. Milestone 6 Smart Edit and
+5 persistence, recovery, knowledge, diagnostics, and desktop polish is
+accepted. Milestone 6 Smart Edit and
 selected-text editing is accepted. Its cloud path is off by default, keeps
 provider keys in Windows Credential Manager, and revalidates the foreground
 target and exact selection before replacement. Milestone 7 packaging is
@@ -64,23 +65,43 @@ See the [Milestone 7 status](docs/MILESTONE_7_STATUS.md) for packaging behavior,
 release artifacts and checksums, automated qualification, and the pending
 manual-review steps.
 
-See the [clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
+The macOS implementation now covers the complete planned engineering sequence:
+shared presentation/input extraction, an Avalonia menu-bar shell, native global
+hotkeys and permissions, Core Audio capture, Core ML-enabled Whisper,
+foreground and exact-selection tracking, sequence-safe paste and grapheme
+typing, Keychain and LaunchAgent persistence, adapter tests, and dual-architecture
+sign/notarize/release scripts. With .NET SDK 10.0.302 and Xcode 26.6, both
+Apple-silicon and Intel self-contained bundles now publish, sign, and pass their
+packaged-app smoke checks, and all cross-platform/macOS automated test suites
+pass in a normal Terminal session. On August 11, 2026, an
+Apple-Development-signed Apple Silicon bundle also passed the primary live
+workflow: Microphone and Accessibility authorization, global shortcut capture,
+local transcription, and Paste Mode insertion into TextEdit and native GNU
+Emacs. Final qualification still requires the rest of the interactive
+clean-room matrix, a Developer ID distribution identity, and Apple
+notarization.
+
+See the [Windows clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
 for downloading the qualified GitHub release assets, checksum verification,
 installer and portable setup, first-run model download, offline dictation, and
 removal on Windows 11 x64.
 
-See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the planned
-cross-platform boundaries and native macOS replacements.
+See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the implemented
+architecture, milestone record, developer commands, and remaining qualification
+gates. The [macOS clean-room guide](docs/MACOS_CLEAN_ROOM_INSTALLATION.md) covers
+installation, permissions, offline use, acceptance, and removal.
 
-## Initial target
+## Platforms
 
-- Windows 11 x64
-- C# and .NET 10
-- WPF desktop application
-- Local Whisper speech recognition
-- Self-contained, non-administrator installation
+- Windows 11 x64: WPF/Win32/NAudio, implemented and automatically qualified.
+- macOS 14+ on Apple Silicon and Intel: Avalonia/native Apple APIs, implemented;
+  automated bundles and the development-signed Apple Silicon TextEdit/Emacs
+  workflow are qualified, with the broader interactive and distribution matrix
+  pending.
+- C# 14 and .NET 10, local Whisper speech recognition, and self-contained
+  end-user packages on both platforms.
 
-## Development
+## Windows development
 
 Prerequisites for source builds are Windows 11 x64, Windows PowerShell 5.1 or
 later, Git, and internet access for the initial SDK and NuGet package downloads.
@@ -186,6 +207,29 @@ script's explicit paid-call switch.
 
 Speech models, the local SDK, NuGet caches, and generated benchmark output are
 excluded from Git.
+
+## macOS development
+
+macOS source builds require macOS 14 or newer, the repository-pinned .NET SDK
+10.0.302, Git, and full Xcode selected with `xcode-select`. Homebrew is only a
+convenient way to install the SDK; end users need none of these tools.
+
+```zsh
+brew install --cask dotnet-sdk
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+./scripts/macos/test.sh
+dotnet run --project tools/DictaClone.MacProbe
+./scripts/macos/build-app.sh
+```
+
+The default build is self-contained for the host architecture and ad-hoc signed
+for local testing. Set `DICTACLONE_CODESIGN_IDENTITY` to a Developer ID
+Application identity for distribution. Set `DICTACLONE_NOTARY_PROFILE` to a
+stored `notarytool` profile before running `scripts/macos/notarize-app.sh`.
+`scripts/macos/new-release.sh` tests and builds both `osx-arm64` and `osx-x64`
+archives with checksums. When both signing and notary variables are set, it
+notarizes, staples, and repackages both archives before producing the final
+checksums.
 
 ## License
 

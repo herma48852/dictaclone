@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DictaClone.Core/DictaClone.Core.csproj" />
+    <ProjectReference Include="../DictaClone.Speech/DictaClone.Speech.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../DictaClone.App/Presentation/LiveDictationController.cs"
+             Link="Presentation/LiveDictationController.cs" />
+    <Compile Include="../DictaClone.App/Presentation/OverlayStatus.cs"
+             Link="Presentation/OverlayStatus.cs" />
+    <Compile Include="../DictaClone.App/Presentation/TriggerUiController.cs"
+             Link="Presentation/TriggerUiController.cs" />
+    <Compile Include="../DictaClone.App/TranscriptHistoryRecorder.cs"
+             Link="TranscriptHistoryRecorder.cs" />
+  </ItemGroup>
+</Project>

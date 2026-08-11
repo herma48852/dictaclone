@@ -8,4 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="../DictaClone.Core/DictaClone.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Input/RawInputModels.cs" />
+    <Compile Remove="Input/ShortcutInterpreter.cs" />
+  </ItemGroup>
 </Project>

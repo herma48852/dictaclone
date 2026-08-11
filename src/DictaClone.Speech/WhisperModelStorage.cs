@@ -22,6 +22,16 @@ public static class WhisperModelStorage
             return repositoryModels;
         }
 
+        if (OperatingSystem.IsMacOS())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library",
+                "Application Support",
+                "DictaClone",
+                "Models");
+        }
+
         string localAppData = Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(localAppData, "DictaClone", "Models");

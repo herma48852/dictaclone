@@ -1,4 +1,7 @@
-# Clean-room installation and use
+# Windows clean-room installation and use
+
+This document covers Windows. For macOS, use the
+[macOS clean-room installation and use guide](MACOS_CLEAN_ROOM_INSTALLATION.md).
 
 This guide installs and exercises DictaClone on a Windows 11 x64 computer or
 Windows user profile that has not previously run DictaClone. A standard,

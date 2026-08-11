@@ -1,6 +1,12 @@
 # DictaClone 0.1.1 release notes
 
-Release status: pre-release qualification build for Windows 11 x64.
+Release status: pre-release qualification build for Windows 11 x64. A macOS
+14+ port is implemented; Apple-silicon and Intel development bundles pass
+build, signature, and packaged-app smoke checks, and its automated suites pass
+in a normal Terminal session. An Apple-Development-signed Apple Silicon bundle
+also passes the primary live permission, dictation, and Paste Mode workflow in
+TextEdit and native GNU Emacs. The broader interactive matrix, Developer ID,
+and notarization qualification remain.
 
 ## Included
 
@@ -23,6 +29,12 @@ Release status: pre-release qualification build for Windows 11 x64.
   per-user installer.
 - A clean-room guide covering checksum verification, installation, first use,
   offline dictation, portable use, and removal.
+- A .NET 10/Avalonia macOS menu-bar app with native Core Audio, Core Graphics,
+  Accessibility, pasteboard, Keychain, and LaunchAgent adapters for Apple
+  Silicon and Intel.
+- macOS adapter tests, a native permission/device probe, a dedicated clean-room
+  guide, and scripted app-bundle creation, signing, notarization, verification,
+  dual-architecture archives, and checksums.
 
 ## Installation behavior
 
@@ -46,3 +58,8 @@ Release status: pre-release qualification build for Windows 11 x64.
   elevated by default.
 - Smart Edit requires network access and a separately supplied provider API
   key. Ordinary dictation stays local and works offline after model download.
+- The macOS app is not yet a public release artifact. Its development-signed
+  Apple Silicon TextEdit/Emacs workflow is qualified, but the remaining
+  interactive and Intel-hardware matrix still requires completion together
+  with a Developer ID-signed and Apple-notarized bundle. The .NET 10/Xcode
+  development builds and smoke checks pass for both supported architectures.

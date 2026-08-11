@@ -11,8 +11,17 @@ public sealed record DictaCloneDataPaths(string RootDirectory)
         "diagnostics.jsonl");
 
     public static DictaCloneDataPaths Default { get; } = new(
-        Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.LocalApplicationData),
-            "DictaClone"));
+        ResolveDefaultRootDirectory());
+
+    private static string ResolveDefaultRootDirectory() =>
+        OperatingSystem.IsMacOS()
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library",
+                "Application Support",
+                "DictaClone")
+            : Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                "DictaClone");
 }

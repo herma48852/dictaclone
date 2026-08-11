@@ -1,10 +1,13 @@
 # DictaClone implementation plan
 
-Status: Milestones 0-6 complete and accepted; Milestone 7 implementation and
-automated qualification are complete. Manual acceptance is deferred until a
-new Windows 11 x64 laptop is available.
+Status: Windows Milestones 0-6 are complete and accepted; Windows Milestone 7
+implementation and automated qualification are complete. The macOS engineering
+milestones are implemented and dual-architecture development bundles are
+qualified. All cross-platform/macOS automated suites pass, with interactive
+permission/insertion and Developer ID/notarization acceptance pending. See
+`docs/MACOS_PORTING_GUIDE.md`.
 
-Last reviewed: 2026-08-05
+Last reviewed: 2026-08-11
 
 ## 1. Product goal
 
@@ -43,7 +46,7 @@ DictaClone will target functional parity in staged milestones:
 | Smart Edit and selected-text editing | Yes, through an explicitly configured provider | Bundled on-device generative model if performance is acceptable |
 | Local history/recovery | Opt-in, text only | Search and tagging |
 | Accounts, billing, word quotas, telemetry | No | Not planned |
-| macOS | No | Planned after the Windows release; see `docs/MACOS_PORTING_GUIDE.md` |
+| macOS | Port implemented; final qualification pending | See `docs/MACOS_PORTING_GUIDE.md` |
 | Mobile, Telegram, or browser extensions | No | Not planned |
 
 ## 3. Target machine and feasibility

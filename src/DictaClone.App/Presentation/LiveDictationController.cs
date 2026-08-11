@@ -1,5 +1,4 @@
 using System.Net.Http;
-using DictaClone.Audio;
 using DictaClone.Core.Contracts;
 using DictaClone.Core.Dictation;
 using DictaClone.Core.Hotkeys;
@@ -545,8 +544,10 @@ public sealed class LiveDictationController : IAsyncDisposable
     private static string GetFailureLabel(Exception exception) =>
         exception switch
         {
-            AudioCaptureDeviceException =>
-                "Microphone unavailable; check the selected device and Windows microphone privacy settings",
+            AudioCaptureException =>
+                "Microphone unavailable; check the selected device and microphone privacy settings",
+            PlatformPermissionException permission =>
+                $"{permission.Permission} permission is required; open privacy settings to enable it",
             ModelIntegrityException => "Speech model verification failed",
             HttpRequestException => "Speech model is unavailable offline",
             ForegroundTargetUnavailableException =>
@@ -556,11 +557,11 @@ public sealed class LiveDictationController : IAsyncDisposable
             SelectionChangedException =>
                 "Selection changed; Smart Edit result was not inserted (use Copy last result)",
             ElevatedTargetException =>
-                "Windows blocks input to elevated apps",
+                "The operating system blocks input to this app",
             ClipboardContentionException =>
                 "Clipboard is busy; text was not inserted",
             InputInjectionException =>
-                "Windows blocked text insertion",
+                "The operating system blocked text insertion",
             SmartEditNotConfiguredException =>
                 "Smart Edit needs an API key in Smart Edit settings",
             SmartEditAuthenticationException =>

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using DictaClone.Core.Contracts;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Input;
 
 namespace DictaClone.Windows.Input;
 

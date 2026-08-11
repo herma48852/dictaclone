@@ -3,7 +3,10 @@
     <Project Path="src/DictaClone.App/DictaClone.App.csproj" />
     <Project Path="src/DictaClone.Audio/DictaClone.Audio.csproj" />
     <Project Path="src/DictaClone.Core/DictaClone.Core.csproj" />
+    <Project Path="src/DictaClone.Desktop/DictaClone.Desktop.csproj" />
     <Project Path="src/DictaClone.Infrastructure/DictaClone.Infrastructure.csproj" />
+    <Project Path="src/DictaClone.Mac/DictaClone.Mac.csproj" />
+    <Project Path="src/DictaClone.Mac.App/DictaClone.Mac.App.csproj" />
     <Project Path="src/DictaClone.Speech/DictaClone.Speech.csproj" />
     <Project Path="src/DictaClone.Text/DictaClone.Text.csproj" />
     <Project Path="src/DictaClone.Windows/DictaClone.Windows.csproj" />
@@ -14,6 +17,7 @@
     <Project Path="tests/DictaClone.Core.Tests/DictaClone.Core.Tests.csproj" />
     <Project Path="tests/DictaClone.EndToEndTests/DictaClone.EndToEndTests.csproj" />
     <Project Path="tests/DictaClone.IntegrationTests/DictaClone.IntegrationTests.csproj" />
+    <Project Path="tests/DictaClone.Mac.Tests/DictaClone.Mac.Tests.csproj" />
     <Project Path="tests/DictaClone.Infrastructure.Tests/DictaClone.Infrastructure.Tests.csproj" />
     <Project Path="tests/DictaClone.Speech.Tests/DictaClone.Speech.Tests.csproj" />
     <Project Path="tests/DictaClone.Text.Tests/DictaClone.Text.Tests.csproj" />
@@ -22,5 +26,6 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/DictaClone.DevTools/DictaClone.DevTools.csproj" />
+    <Project Path="tools/DictaClone.MacProbe/DictaClone.MacProbe.csproj" />
   </Folder>
 </Solution>

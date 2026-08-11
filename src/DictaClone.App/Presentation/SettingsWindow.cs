@@ -8,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using DictaClone.Audio;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Input;
 using DictaClone.Core.Settings;
 using DictaClone.Speech;
 using DictaClone.Windows.Input;

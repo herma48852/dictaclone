@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using DictaClone.App.Presentation;
 using DictaClone.Core.Hotkeys;
+using DictaClone.Core.Input;
 using DictaClone.Windows.Input;
 
 namespace DictaClone.App.Tests;

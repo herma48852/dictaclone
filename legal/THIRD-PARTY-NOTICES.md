@@ -1,6 +1,6 @@
 # DictaClone third-party notices
 
-DictaClone 0.1.0 includes the following third-party components. The project
+DictaClone 0.1.1 includes the following third-party components. The project
 does not modify or replace the terms of their respective licenses.
 
 ## Runtime components
@@ -9,8 +9,9 @@ does not modify or replace the terms of their respective licenses.
 | --- | --- | --- | --- |
 | Microsoft .NET and Windows Desktop Runtime | 10.0 | MIT and component-specific notices | https://github.com/dotnet/runtime |
 | Microsoft.Extensions.AI.Abstractions | 10.2.0 | MIT | https://dot.net/ |
+| Avalonia, Avalonia.Desktop, and Avalonia.Themes.Fluent | 12.1.0 | MIT | https://github.com/AvaloniaUI/Avalonia |
 | NAudio, including Core, Asio, Midi, Wasapi, WinForms, and WinMM packages | 2.3.0 | MIT | https://github.com/naudio/NAudio |
-| Whisper.net and Whisper.net runtime packages | 1.9.1 | MIT | https://github.com/sandrohanea/whisper.net |
+| Whisper.net and its Windows and Core ML runtime packages | 1.9.1 | MIT | https://github.com/sandrohanea/whisper.net |
 | whisper.cpp / ggml native runtime, distributed through Whisper.net | Whisper.net 1.9.1 dependency | MIT | https://github.com/ggml-org/whisper.cpp |
 
 The self-contained .NET publish also carries the notices supplied by the .NET
@@ -29,6 +30,7 @@ and source are available from https://jrsoftware.org/isinfo.php.
 Copyright notices for the MIT-licensed components include:
 
 - Copyright © .NET Foundation and Contributors.
+- Copyright © AvaloniaUI and Avalonia contributors.
 - Copyright © Mark Heath and NAudio contributors.
 - Copyright © Sandro Hanea and Whisper.net contributors.
 - Copyright © Georgi Gerganov and whisper.cpp contributors.
