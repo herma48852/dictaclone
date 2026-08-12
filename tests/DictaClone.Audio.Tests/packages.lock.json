@@ -147,7 +147,7 @@
       "dictaclone.audio": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.0, )",
+          "DictaClone.Core": "[0.1.2, )",
           "NAudio": "[2.3.0, )"
         }
       },

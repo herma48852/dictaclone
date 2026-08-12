@@ -215,7 +215,7 @@ Build and verify a development bundle for the current or named architecture:
 ```zsh
 ./scripts/macos/build-app.sh
 ./scripts/macos/build-app.sh osx-x64
-./scripts/macos/verify-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
+./scripts/macos/verify-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
 ```
 
 With no identity configured, `build-app.sh` uses an ad-hoc signature for local
@@ -240,8 +240,8 @@ export DICTACLONE_CODESIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
 xcrun notarytool store-credentials DictaCloneNotary
 export DICTACLONE_NOTARY_PROFILE='DictaCloneNotary'
 ./scripts/macos/build-app.sh osx-arm64
-./scripts/macos/notarize-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
-./scripts/macos/verify-app.sh artifacts/macos/0.1.1/osx-arm64/DictaClone.app
+./scripts/macos/notarize-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
+./scripts/macos/verify-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
 ```
 
 `sign-app.sh` signs nested Mach-O files from the inside out and intentionally

@@ -66,15 +66,10 @@
           "NAudio.Core": "2.3.0"
         }
       },
-      "Whisper.net.Runtime.Metal": {
-        "type": "Transitive",
-        "resolved": "1.9.1",
-        "contentHash": "Ut5tZyCUwXMVdThoLvdvQ7GyLwjRMreR/p3LuMJvRiXidQ2AXxx2Tv8UOGtMxvL395AC3+IkHdN/kMfd+EPSEw=="
-      },
       "dictaclone.audio": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.0, )",
+          "DictaClone.Core": "[0.1.2, )",
           "NAudio": "[2.3.0, )"
         }
       },
@@ -84,9 +79,8 @@
       "dictaclone.speech": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.0, )",
-          "Whisper.net": "[1.9.1, )",
-          "Whisper.net.Runtime": "[1.9.1, )"
+          "DictaClone.Core": "[0.1.2, )",
+          "Whisper.net": "[1.9.1, )"
         }
       },
       "Whisper.net": {
@@ -96,15 +90,6 @@
         "contentHash": "82WAKyyMun44cAXE80sP7vIra1oYhbVp2WrnqJm0CISTfMAvint1k/umt0SvsQH+IkDyekZ3BgMdS3Rag9SZ5A==",
         "dependencies": {
           "Microsoft.Extensions.AI.Abstractions": "10.2.0"
-        }
-      },
-      "Whisper.net.Runtime": {
-        "type": "CentralTransitive",
-        "requested": "[1.9.1, )",
-        "resolved": "1.9.1",
-        "contentHash": "TipPJkry69VwJ3XL38U082QK5Trqte6NgSOoosuyj/C1eRHabmBbLQ3ujjcDryg5pkXT7wXwAKU5+PxGIJyxkQ==",
-        "dependencies": {
-          "Whisper.net.Runtime.Metal": "1.9.1"
         }
       }
     }

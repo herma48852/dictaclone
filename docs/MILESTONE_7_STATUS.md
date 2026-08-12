@@ -3,7 +3,7 @@
 Status: Implementation and automated qualification complete. Manual acceptance
 is deferred until a new Windows 11 x64 laptop is available.
 
-Last updated: 2026-08-05
+Last updated: 2026-08-12
 
 ## Delivered
 
@@ -25,21 +25,21 @@ Last updated: 2026-08-05
 - Additional clipboard-format, false-empty snapshot, exact-publish, ownership,
   and contention regressions. A deterministic 100-dictation controller stress
   and 50 clipboard-transaction stress are part of the automated suite.
+- The 0.1.2 reliability update lowers the default silence threshold while
+  preserving customized values, extends bounded clipboard retries, and reports
+  empty capture, quiet audio, and unrecognized speech separately.
 
 ## Qualification artifacts
 
-The current review build is under `artifacts\release\0.1.0`:
-
-| Artifact | Bytes | SHA-256 |
-| --- | ---: | --- |
-| `DictaClone-0.1.0-win-x64-portable.zip` | 75,455,316 | `df1b6cb0dcf858dd128b9cfc58d7b4d83c84bd8bc2484d3c248d079929076ee8` |
-| `DictaClone-0.1.0-win-x64-setup.exe` | 56,276,778 | `93605be6c806f51e3912ff526a577c06042f5a4da8ba4e627b329a29246638ab` |
+The current review build is under `artifacts\release\0.1.2`. Its
+`release-manifest.json` records the exact source commit, clean-worktree state,
+file sizes, and per-artifact SHA-256 values; `SHA256SUMS.txt` covers every file
+distributed from the release directory. These generated values are the
+authoritative artifact record and avoid duplicating checksums in maintained
+documentation.
 
 This is an unsigned, pre-release qualification build. Windows SmartScreen may
-warn before launch; compare the artifact with `SHA256SUMS.txt`. Because the
-milestone is intentionally uncommitted during review, its manifest records
-`sourceDirty: true` and commit `59186b2`. Rebuild release artifacts from the
-clean accepted commit before distribution.
+warn before launch; compare every artifact with `SHA256SUMS.txt`.
 
 Generated release artifacts are excluded from Git and are not present in a
 fresh clone. For clean-room review, transfer the complete
@@ -53,13 +53,13 @@ portable application does not.
 ## Automated evidence
 
 - The clean Release build completed with zero warnings and zero errors.
-- All 273 non-desktop, offline unit/integration/regression cases passed.
-- `DictaClone.Core` line coverage is **94.61%** (614/649), above the required
+- All 318 non-desktop, offline unit/integration/regression cases passed,
+  including all 28 macOS adapter tests on Windows.
+- `DictaClone.Core` line coverage is **94.99%** (720/758), above the required
   90% gate.
 - All three standard real-desktop E2E cases passed with direct Windows desktop
-  access. A sandboxed attempt lost foreground focus and failed one paste; the
-  isolated case and complete desktop subset then passed outside that sandbox.
-- Artifact validation confirmed version 0.1.0, self-contained `win-x64`
+  access.
+- Artifact validation confirmed version 0.1.2, self-contained `win-x64`
   architecture, required legal/release files, checksum integrity, and a bounded
   portable-process smoke test.
 - The isolated installer lifecycle passed non-admin per-user install, explicit
@@ -67,6 +67,11 @@ portable application does not.
   repair, uninstall, and retained-user-data checks.
 - Post-test inspection found no temporary installation directory, DictaClone
   startup value, or Installed Apps entry.
+
+Live 0.1.2 acceptance on 2026-08-12 confirmed normal and deliberately garbled
+speech in Notepad and normal dictation into Codex CLI through Windows Terminal.
+Neither the prior clipboard-contention failure nor the false no-speech result
+recurred.
 
 The optional 50-cycle **real desktop** stress remains a manual review item. It
 cannot be made deterministic while another program changes the foreground

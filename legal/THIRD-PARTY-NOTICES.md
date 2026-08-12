@@ -1,6 +1,6 @@
 # DictaClone third-party notices
 
-DictaClone 0.1.1 includes the following third-party components. The project
+DictaClone 0.1.2 includes the following third-party components. The project
 does not modify or replace the terms of their respective licenses.
 
 ## Runtime components

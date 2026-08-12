@@ -18,6 +18,9 @@ public sealed class SettingsValidatorTests
         Assert.True(settings.Text.EnableCorrections);
         Assert.Null(settings.Audio.DeviceId);
         Assert.Equal(
+            DictaCloneSettings.DefaultSilenceThreshold,
+            settings.Audio.SilenceThreshold);
+        Assert.Equal(
             DictaCloneSettings.CurrentSchemaVersion,
             settings.SchemaVersion);
         Assert.Equal(WorkDomainPreset.General, settings.Text.WorkDomain);

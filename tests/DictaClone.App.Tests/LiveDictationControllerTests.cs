@@ -129,7 +129,53 @@ public sealed class LiveDictationControllerTests
 
         Assert.Equal(0, transcription.CallCount);
         Assert.Null(controller.LastTranscript);
-        Assert.Contains("No speech", overlay.Messages[^1]);
+        Assert.Contains("too quiet", overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task EmptyCapture_ExplainsMicrophoneAudioWasMissing()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio() with
+        {
+            Pcm16 = ReadOnlyMemory<byte>.Empty,
+        });
+        var transcription = new FakeTranscriptionEngine("unexpected");
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            transcription,
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+        await controller.HandleAsync(Release);
+
+        Assert.Equal(0, transcription.CallCount);
+        Assert.Contains("No microphone audio", overlay.Messages[^1]);
+    }
+
+    [Fact]
+    public async Task BlankTranscript_ExplainsSpeechWasNotRecognized()
+    {
+        var session = new FakeCaptureSession(CreateSpeechAudio());
+        var overlay = new FakeOverlay();
+        await using var controller = new LiveDictationController(
+            new FakeCaptureService(session),
+            new FakeTranscriptionEngine("  "),
+            new FakeTextProcessor(text => text),
+            new FakeForegroundTargetService(),
+            new FakeTextInsertionService(),
+            overlay,
+            DictaCloneSettings.Default);
+
+        await controller.HandleAsync(Press);
+        await controller.HandleAsync(Release);
+
+        Assert.Null(controller.LastTranscript);
+        Assert.Contains("captured but not recognized", overlay.Messages[^1]);
     }
 
     [Fact]
@@ -330,7 +376,7 @@ public sealed class LiveDictationControllerTests
     }
 
     [Theory]
-    [InlineData(typeof(ElevatedTargetException), "elevated")]
+    [InlineData(typeof(ElevatedTargetException), "operating system blocks input")]
     [InlineData(typeof(ClipboardContentionException), "Clipboard is busy")]
     [InlineData(typeof(InputInjectionException), "blocked text insertion")]
     public async Task InsertionFailure_IsActionableAndDoesNotPublishCompletion(

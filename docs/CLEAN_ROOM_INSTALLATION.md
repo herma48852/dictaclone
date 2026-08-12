@@ -14,11 +14,11 @@ download. Normal dictation works offline after that model has been downloaded.
 ## Before installation
 
 For the current qualification build, open the
-[DictaClone 0.1.1 GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.1),
+[DictaClone 0.1.2 GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.2),
 expand **Assets**, and download these five files into one new folder:
 
-- `DictaClone-0.1.1-win-x64-setup.exe`;
-- `DictaClone-0.1.1-win-x64-portable.zip`;
+- `DictaClone-0.1.2-win-x64-setup.exe`;
+- `DictaClone-0.1.2-win-x64-portable.zip`;
 - `CLEAN_ROOM_INSTALLATION.md`;
 - `release-manifest.json`; and
 - `SHA256SUMS.txt`.

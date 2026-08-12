@@ -291,11 +291,19 @@ public sealed class LiveDictationController : IAsyncDisposable
             CapturedAudio audio = await session!
                 .StopAsync(token)
                 .ConfigureAwait(false);
-            if (audio.IsSilent || audio.Pcm16.IsEmpty)
+            if (audio.Pcm16.IsEmpty)
             {
                 Post(() => _overlay.ShowStatus(
                     OverlayStatus.Failure,
-                    "No speech detected"));
+                    "No microphone audio was captured; check the selected microphone"));
+                return;
+            }
+
+            if (audio.IsSilent)
+            {
+                Post(() => _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Speech was too quiet; speak closer or lower the silence threshold"));
                 return;
             }
 
@@ -315,6 +323,14 @@ public sealed class LiveDictationController : IAsyncDisposable
             string transcript = await _transcription
                 .TranscribeAsync(audio, transcriptionSettings, token)
                 .ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(transcript))
+            {
+                Post(() => _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Speech was captured but not recognized; try speaking clearly"));
+                return;
+            }
+
             string instruction = await _textProcessor
                 .ProcessAsync(
                     transcript,
@@ -327,7 +343,7 @@ public sealed class LiveDictationController : IAsyncDisposable
             {
                 Post(() => _overlay.ShowStatus(
                     OverlayStatus.Failure,
-                    "No speech detected"));
+                    "Transcription was removed by text processing; review text settings"));
                 return;
             }
 

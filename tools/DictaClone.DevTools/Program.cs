@@ -248,7 +248,8 @@ internal static class Program
         IAudioCaptureSession session = await service.StartAsync(
                 new(
                     deviceId,
-                    SilenceThreshold: 0.012,
+                    SilenceThreshold:
+                        DictaCloneSettings.DefaultSilenceThreshold,
                     MaximumDuration: TimeSpan.FromSeconds(10)),
                 CancellationToken.None)
             .ConfigureAwait(false);

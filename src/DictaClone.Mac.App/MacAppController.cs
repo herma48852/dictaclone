@@ -638,14 +638,14 @@ public sealed class MacAppController : IAsyncDisposable
 
     private static DictaCloneSettings DisableSmartEdit(
         DictaCloneSettings settings) => settings with
-    {
-        SmartEdit = settings.SmartEdit with { Enabled = false },
-        Hotkeys = settings.Hotkeys
+        {
+            SmartEdit = settings.SmartEdit with { Enabled = false },
+            Hotkeys = settings.Hotkeys
             .Select(binding => binding.Action == HotkeyAction.SmartEdit
                 ? binding with { Enabled = false }
                 : binding)
             .ToImmutableArray(),
-    };
+        };
 
     private static void StartProcess(string fileName, string argument)
     {

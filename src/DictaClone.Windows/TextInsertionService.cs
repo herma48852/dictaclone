@@ -8,12 +8,12 @@ namespace DictaClone.Windows;
 public sealed class TextInsertionService : ITextInsertionService
 {
     private static readonly TimeSpan DefaultClipboardRetryDelay =
-        TimeSpan.FromMilliseconds(15);
+        TimeSpan.FromMilliseconds(25);
     private static readonly TimeSpan DefaultClipboardReadyDelay =
         TimeSpan.FromMilliseconds(25);
     private static readonly TimeSpan DefaultClipboardRestoreDelay =
         TimeSpan.FromMilliseconds(250);
-    private const int DefaultClipboardAttempts = 5;
+    private const int DefaultClipboardAttempts = 10;
 
     private readonly IClipboardBackend _clipboard;
     private readonly IKeyboardInjector _keyboard;

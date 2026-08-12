@@ -1,4 +1,4 @@
-# DictaClone 0.1.1 release notes
+# DictaClone 0.1.2 release notes
 
 Release status: pre-release qualification build for Windows 11 x64. A macOS
 14+ port is implemented; Apple-silicon and Intel development bundles pass
@@ -7,6 +7,28 @@ in a normal Terminal session. An Apple-Development-signed Apple Silicon bundle
 also passes the primary live permission, dictation, and Paste Mode workflow in
 TextEdit and native GNU Emacs. The broader interactive matrix, Developer ID,
 and notarization qualification remain.
+
+## Reliability improvements
+
+- Quiet speech is less likely to be rejected before transcription. The default
+  silence threshold is now `0.006`; schema-5 migration updates the former
+  `0.012` default while preserving thresholds the user customized.
+- Paste Mode now retries transient clipboard contention for approximately 1.1
+  seconds with bounded incremental backoff. Copying the last result and copying
+  transcript-history entries use the same resilient behavior.
+- Capture failures now distinguish an empty microphone stream, audio below the
+  silence threshold, and speech that Whisper captured but could not recognize.
+  These messages remain privacy-safe and contain no audio or transcript text.
+- Automated regressions cover quiet speech that the former default rejected,
+  extended clipboard contention, schema migration, and the distinct capture
+  failure messages.
+
+## Live compatibility confirmation
+
+- Normal and deliberately garbled speech were transcribed and inserted in
+  Notepad without reproducing the previous clipboard failure.
+- Normal dictation was transcribed and inserted into Codex CLI through Windows
+  Terminal without reproducing the previous false no-speech result.
 
 ## Included
 

@@ -1,4 +1,5 @@
 using DictaClone.Core.Dictation;
+using DictaClone.Core.Settings;
 using NAudio.Wave;
 
 namespace DictaClone.Audio;
@@ -7,7 +8,8 @@ public static class AudioFileLoader
 {
     public static async Task<CapturedAudio> LoadAsync(
         string wavePath,
-        double silenceThreshold = 0.012,
+        double silenceThreshold =
+            DictaCloneSettings.DefaultSilenceThreshold,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(wavePath);

@@ -191,6 +191,28 @@ public sealed class TextInsertionServiceTests
     }
 
     [Fact]
+    public async Task Paste_DefaultRetryWindow_OutlastsBriefClipboardOwner()
+    {
+        var context = new TestContext(useDefaultClipboardPolicy: true);
+        context.Clipboard.CaptureFailuresRemaining = 6;
+
+        await context.Service.InsertAsync(
+            "retry longer",
+            LocalTarget,
+            new(TextInsertionMode.Paste, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(7, context.Clipboard.CaptureCalls);
+        Assert.Equal(1, context.Clipboard.SetTextCalls);
+        Assert.Equal(1, context.Clipboard.RestoreCalls);
+        Assert.Equal(
+            [25, 50, 75, 100, 125, 150],
+            context.Delay.BlockingWaits
+                .Take(6)
+                .Select(delay => (int)delay.TotalMilliseconds));
+    }
+
+    [Fact]
     public async Task Paste_ReportsPersistentClipboardContention()
     {
         var context = new TestContext(clipboardAttempts: 3);
@@ -366,19 +388,26 @@ public sealed class TextInsertionServiceTests
     private sealed class TestContext
     {
         public TestContext(
-            int clipboardAttempts = 5,
-            TimeSpan? clipboardRestoreDelay = null)
+            int clipboardAttempts = 10,
+            TimeSpan? clipboardRestoreDelay = null,
+            bool useDefaultClipboardPolicy = false)
         {
-            Service = new(
-                Clipboard,
-                Keyboard,
-                StaThreads,
-                Delay,
-                clipboardAttempts,
-                clipboardRetryDelay: TimeSpan.FromMilliseconds(1),
-                clipboardReadyDelay: TimeSpan.FromMilliseconds(1),
-                clipboardRestoreDelay:
-                    clipboardRestoreDelay ?? TimeSpan.FromMilliseconds(1));
+            Service = useDefaultClipboardPolicy
+                ? new(
+                    Clipboard,
+                    Keyboard,
+                    StaThreads,
+                    Delay)
+                : new(
+                    Clipboard,
+                    Keyboard,
+                    StaThreads,
+                    Delay,
+                    clipboardAttempts,
+                    clipboardRetryDelay: TimeSpan.FromMilliseconds(1),
+                    clipboardReadyDelay: TimeSpan.FromMilliseconds(1),
+                    clipboardRestoreDelay:
+                        clipboardRestoreDelay ?? TimeSpan.FromMilliseconds(1));
         }
 
         public FakeClipboardBackend Clipboard { get; } = new();

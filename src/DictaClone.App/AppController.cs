@@ -33,6 +33,7 @@ public sealed class AppController : IAsyncDisposable
     private readonly StartupRegistrationService _startupRegistration;
     private readonly WindowsCredentialSecretStore _secretStore;
     private readonly HttpClient _smartEditHttpClient;
+    private readonly ClipboardTextWriter _clipboardTextWriter = new();
     private readonly SemaphoreSlim _settingsApplyGate = new(1, 1);
     private ImmutableArray<HotkeyBinding> _bindings;
     private DictaCloneSettings _settings;
@@ -362,7 +363,7 @@ public sealed class AppController : IAsyncDisposable
         }
     }
 
-    private void CopyLastTranscript()
+    private async void CopyLastTranscript()
     {
         string? transcript = _dictationUi.LastTranscript;
         if (string.IsNullOrWhiteSpace(transcript))
@@ -375,7 +376,17 @@ public sealed class AppController : IAsyncDisposable
 
         try
         {
-            System.Windows.Clipboard.SetText(transcript);
+            bool copied = await _clipboardTextWriter.TryWriteAsync(
+                transcript,
+                CancellationToken.None);
+            if (!copied)
+            {
+                _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Clipboard is busy; copy the last result again");
+                return;
+            }
+
             _overlay.ShowStatus(
                 OverlayStatus.Success,
                 "✓  Last result copied");
@@ -427,13 +438,23 @@ public sealed class AppController : IAsyncDisposable
         _historyWindow.Activate();
     }
 
-    private void HistoryCopyRequested(
+    private async void HistoryCopyRequested(
         object? sender,
         HistoryCopyRequestedEventArgs eventArgs)
     {
         try
         {
-            System.Windows.Clipboard.SetText(eventArgs.Entry.Text);
+            bool copied = await _clipboardTextWriter.TryWriteAsync(
+                eventArgs.Entry.Text,
+                CancellationToken.None);
+            if (!copied)
+            {
+                _overlay.ShowStatus(
+                    OverlayStatus.Failure,
+                    "Clipboard is busy; try copying again");
+                return;
+            }
+
             _overlay.ShowStatus(
                 OverlayStatus.Success,
                 "✓  History entry copied");

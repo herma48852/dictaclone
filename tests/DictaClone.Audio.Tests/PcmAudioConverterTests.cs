@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using DictaClone.Audio;
 using DictaClone.Core.Dictation;
+using DictaClone.Core.Settings;
 using NAudio.Wave;
 
 namespace DictaClone.Audio.Tests;
@@ -132,6 +133,34 @@ public sealed class PcmAudioConverterTests
     }
 
     [Fact]
+    public void DefaultThreshold_AcceptsQuietSpeechRejectedByLegacyDefault()
+    {
+        const int sampleRate = 16_000;
+        var samples = new short[sampleRate];
+        AddSineBurst(
+            samples,
+            sampleRate,
+            startSeconds: 0.2,
+            durationSeconds: 0.4,
+            amplitude: 0.012);
+        byte[] source = new byte[samples.Length * sizeof(short)];
+        Buffer.BlockCopy(samples, 0, source, 0, source.Length);
+        var format = new WaveFormat(sampleRate, bits: 16, channels: 1);
+
+        CapturedAudio current = PcmAudioConverter.ConvertToWhisperPcm16(
+            source,
+            format,
+            DictaCloneSettings.DefaultSilenceThreshold);
+        CapturedAudio legacy = PcmAudioConverter.ConvertToWhisperPcm16(
+            source,
+            format,
+            silenceThreshold: 0.012);
+
+        Assert.False(current.IsSilent);
+        Assert.True(legacy.IsSilent);
+    }
+
+    [Fact]
     public void WindowedActivity_RejectsBriefNoiseShorterThanMinimumSpeech()
     {
         const int sampleRate = 16_000;
@@ -170,13 +199,14 @@ public sealed class PcmAudioConverterTests
         short[] destination,
         int sampleRate,
         double startSeconds,
-        double durationSeconds)
+        double durationSeconds,
+        double amplitude = 0.04)
     {
         int start = checked((int)(startSeconds * sampleRate));
         int count = checked((int)(durationSeconds * sampleRate));
         for (int index = 0; index < count; index++)
         {
-            double sample = 0.04 * Math.Sin(
+            double sample = amplitude * Math.Sin(
                 2 * Math.PI * 220 * index / sampleRate);
             destination[start + index] = checked((short)Math.Round(
                 sample * short.MaxValue));

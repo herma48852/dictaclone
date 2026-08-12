@@ -173,8 +173,8 @@ manual review with:
 .\scripts\Invoke-Milestone7ManualTest.ps1
 ```
 
-For clean-room testing of version 0.1.1, open the
-[GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.1),
+For clean-room testing of version 0.1.2, open the
+[GitHub prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.2),
 expand **Assets**, and download the installer, the specifically named portable
 ZIP, `CLEAN_ROOM_INSTALLATION.md`, `release-manifest.json`, and
 `SHA256SUMS.txt` into one folder. Do not use GitHub's automatically generated
@@ -183,12 +183,12 @@ for checksum verification, installation, and ordinary use.
 
 As an offline alternative, transfer the complete
 `artifacts\release\<version>` directory from the trusted build machine. For the
-complete acceptance review, clone tag `v0.1.1` on the clean test machine and
+complete acceptance review, clone tag `v0.1.2` on the clean test machine and
 pass the full path of the downloaded or transferred release folder explicitly:
 
 ```powershell
 .\scripts\Invoke-Milestone7ManualTest.ps1 `
-    -ReleaseDirectory 'D:\DictaClone-0.1.1'
+    -ReleaseDirectory 'D:\DictaClone-0.1.2'
 ```
 
 Leave the keyboard, mouse, clipboard, and foreground window untouched while

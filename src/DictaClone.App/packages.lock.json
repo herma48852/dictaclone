@@ -69,7 +69,7 @@
       "dictaclone.audio": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )",
+          "DictaClone.Core": "[0.1.2, )",
           "NAudio": "[2.3.0, )"
         }
       },
@@ -79,33 +79,33 @@
       "dictaclone.desktop": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )",
-          "DictaClone.Speech": "[0.1.1, )"
+          "DictaClone.Core": "[0.1.2, )",
+          "DictaClone.Speech": "[0.1.2, )"
         }
       },
       "dictaclone.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )"
+          "DictaClone.Core": "[0.1.2, )"
         }
       },
       "dictaclone.speech": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )",
+          "DictaClone.Core": "[0.1.2, )",
           "Whisper.net": "[1.9.1, )"
         }
       },
       "dictaclone.text": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )"
+          "DictaClone.Core": "[0.1.2, )"
         }
       },
       "dictaclone.windows": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.1, )"
+          "DictaClone.Core": "[0.1.2, )"
         }
       },
       "NAudio": {

@@ -105,7 +105,7 @@
       "dictaclone.windows": {
         "type": "Project",
         "dependencies": {
-          "DictaClone.Core": "[0.1.0, )"
+          "DictaClone.Core": "[0.1.2, )"
         }
       }
     }

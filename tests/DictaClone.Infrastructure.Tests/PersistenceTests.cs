@@ -57,7 +57,7 @@ public sealed class PersistenceTests
     }
 
     [Fact]
-    public async Task Schema1_IsMigratedAndRewrittenAsSchema4()
+    public async Task Schema1_IsMigratedAndRewrittenAsCurrentSchema()
     {
         using var directory = new TemporaryDirectory();
         var transfer = new SettingsTransferService();
@@ -99,7 +99,7 @@ public sealed class PersistenceTests
         Assert.False(loaded.Settings.Preferences.HistoryEnabled);
         string rewritten = await File.ReadAllTextAsync(
             directory.Paths.SettingsFile);
-        Assert.Contains("\"schemaVersion\": 4", rewritten);
+        Assert.Contains("\"schemaVersion\": 5", rewritten);
         Assert.False(loaded.Settings.SmartEdit.Enabled);
     }
 
@@ -143,7 +143,7 @@ public sealed class PersistenceTests
             loaded.Settings.Hotkeys.Single(binding =>
                 binding.Action ==
                     DictaClone.Core.Hotkeys.HotkeyAction.SmartEdit).Chord);
-        Assert.Contains("\"schemaVersion\": 4",
+        Assert.Contains("\"schemaVersion\": 5",
             await File.ReadAllTextAsync(directory.Paths.SettingsFile));
     }
 
@@ -183,8 +183,71 @@ public sealed class PersistenceTests
             loaded.Settings.Hotkeys.Single(binding =>
                 binding.Action == HotkeyAction.Cancel));
         Assert.Contains(
-            "\"schemaVersion\": 4",
+            "\"schemaVersion\": 5",
             await File.ReadAllTextAsync(directory.Paths.SettingsFile));
+    }
+
+    [Fact]
+    public async Task Schema4_DefaultSilenceThreshold_IsLowered()
+    {
+        using var directory = new TemporaryDirectory();
+        var transfer = new SettingsTransferService();
+        string seedPath = Path.Combine(directory.Root, "seed-v4.json");
+        DictaCloneSettings seed = DictaCloneSettings.Default with
+        {
+            Audio = DictaCloneSettings.Default.Audio with
+            {
+                SilenceThreshold = 0.012,
+            },
+        };
+        await transfer.ExportAsync(seedPath, seed, CancellationToken.None);
+        JsonObject document = JsonNode.Parse(
+            await File.ReadAllTextAsync(seedPath))!.AsObject();
+        document["schemaVersion"] = 4;
+        await File.WriteAllTextAsync(
+            directory.Paths.SettingsFile,
+            document.ToJsonString());
+        using var store = new JsonSettingsStore(directory.Paths);
+
+        SettingsLoadResult loaded = await store.LoadAsync(
+            CancellationToken.None);
+
+        Assert.True(loaded.WasMigrated);
+        Assert.Equal(
+            DictaCloneSettings.DefaultSilenceThreshold,
+            loaded.Settings.Audio.SilenceThreshold);
+        Assert.Contains(
+            "\"schemaVersion\": 5",
+            await File.ReadAllTextAsync(directory.Paths.SettingsFile));
+    }
+
+    [Fact]
+    public async Task Schema4_CustomSilenceThreshold_IsPreserved()
+    {
+        using var directory = new TemporaryDirectory();
+        var transfer = new SettingsTransferService();
+        string seedPath = Path.Combine(directory.Root, "custom-v4.json");
+        DictaCloneSettings seed = DictaCloneSettings.Default with
+        {
+            Audio = DictaCloneSettings.Default.Audio with
+            {
+                SilenceThreshold = 0.025,
+            },
+        };
+        await transfer.ExportAsync(seedPath, seed, CancellationToken.None);
+        JsonObject document = JsonNode.Parse(
+            await File.ReadAllTextAsync(seedPath))!.AsObject();
+        document["schemaVersion"] = 4;
+        await File.WriteAllTextAsync(
+            directory.Paths.SettingsFile,
+            document.ToJsonString());
+        using var store = new JsonSettingsStore(directory.Paths);
+
+        SettingsLoadResult loaded = await store.LoadAsync(
+            CancellationToken.None);
+
+        Assert.True(loaded.WasMigrated);
+        Assert.Equal(0.025, loaded.Settings.Audio.SilenceThreshold);
     }
 
     [Fact]

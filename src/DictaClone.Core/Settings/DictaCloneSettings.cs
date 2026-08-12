@@ -13,11 +13,15 @@ public sealed record DictaCloneSettings(
     ApplicationPreferences Preferences,
     SmartEditSettings SmartEdit)
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
+    public const double DefaultSilenceThreshold = 0.006;
 
     public static DictaCloneSettings Default { get; } = new(
         CurrentSchemaVersion,
-        new AudioSettings(null, 0.012, TimeSpan.FromMinutes(2)),
+        new AudioSettings(
+            DeviceId: null,
+            SilenceThreshold: DefaultSilenceThreshold,
+            MaximumDuration: TimeSpan.FromMinutes(2)),
         new TranscriptionSettings("base.en", "en", 0),
         new TextProcessingSettings(
             ImmutableArray<VocabularyEntry>.Empty,

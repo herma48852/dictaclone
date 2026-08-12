@@ -8,6 +8,7 @@ namespace DictaClone.Infrastructure;
 
 internal static class SettingsDocumentCodec
 {
+    private const double Schema4DefaultSilenceThreshold = 0.012;
     private static readonly HotkeyBinding LegacyDictationDefault = new(
         HotkeyAction.Dictation,
         new HotkeyChord(
@@ -34,6 +35,7 @@ internal static class SettingsDocumentCodec
             1 => MigrateSchema1(document),
             2 => MigrateSchema2(document),
             3 => MigrateSchema3(document),
+            4 => MigrateSchema4(document),
             DictaCloneSettings.CurrentSchemaVersion =>
                 JsonSerializer.Deserialize<DictaCloneSettings>(
                     document.Span,
@@ -92,7 +94,7 @@ internal static class SettingsDocumentCodec
 
         return new(
             DictaCloneSettings.CurrentSchemaVersion,
-            old.Audio,
+            MigrateLegacyAudio(old.Audio),
             old.Transcription,
             new TextProcessingSettings(
                 old.Text.Vocabulary,
@@ -120,7 +122,7 @@ internal static class SettingsDocumentCodec
 
         return new(
             DictaCloneSettings.CurrentSchemaVersion,
-            old.Audio,
+            MigrateLegacyAudio(old.Audio),
             old.Transcription,
             old.Text,
             old.Insertion,
@@ -140,7 +142,7 @@ internal static class SettingsDocumentCodec
 
         return new(
             DictaCloneSettings.CurrentSchemaVersion,
-            old.Audio,
+            MigrateLegacyAudio(old.Audio),
             old.Transcription,
             old.Text,
             old.Insertion,
@@ -148,6 +150,33 @@ internal static class SettingsDocumentCodec
             old.Preferences,
             old.SmartEdit);
     }
+
+    private static DictaCloneSettings MigrateSchema4(
+        ReadOnlyMemory<byte> document)
+    {
+        Schema4Settings old =
+            JsonSerializer.Deserialize<Schema4Settings>(
+                document.Span,
+                CompactOptions) ?? throw new InvalidDataException(
+                    "The schema v4 settings document is empty.");
+        return new(
+            DictaCloneSettings.CurrentSchemaVersion,
+            MigrateLegacyAudio(old.Audio),
+            old.Transcription,
+            old.Text,
+            old.Insertion,
+            old.Hotkeys,
+            old.Preferences,
+            old.SmartEdit);
+    }
+
+    private static AudioSettings MigrateLegacyAudio(AudioSettings audio) =>
+        audio.SilenceThreshold == Schema4DefaultSilenceThreshold
+            ? audio with
+            {
+                SilenceThreshold = DictaCloneSettings.DefaultSilenceThreshold,
+            }
+            : audio;
 
     private static ImmutableArray<HotkeyBinding> MigrateHotkeys(
         ImmutableArray<HotkeyBinding> bindings)
@@ -218,6 +247,16 @@ internal static class SettingsDocumentCodec
         ApplicationPreferences Preferences);
 
     private sealed record Schema3Settings(
+        int SchemaVersion,
+        AudioSettings Audio,
+        TranscriptionSettings Transcription,
+        TextProcessingSettings Text,
+        InsertionSettings Insertion,
+        ImmutableArray<HotkeyBinding> Hotkeys,
+        ApplicationPreferences Preferences,
+        SmartEditSettings SmartEdit);
+
+    private sealed record Schema4Settings(
         int SchemaVersion,
         AudioSettings Audio,
         TranscriptionSettings Transcription,
