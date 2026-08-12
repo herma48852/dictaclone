@@ -4,6 +4,7 @@ using DictaClone.Core.Contracts;
 using DictaClone.Core.Hotkeys;
 using DictaClone.Core.Input;
 using DictaClone.Mac.Insertion;
+using DictaClone.Mac.Interop;
 using DictaClone.Mac.Permissions;
 
 namespace DictaClone.Mac.Input;
@@ -13,6 +14,7 @@ public sealed partial class MacHotkeyEventSource : IHotkeyEventSource
     private const uint KeyDown = 10;
     private const uint KeyUp = 11;
     private const uint FlagsChanged = 12;
+    private const uint SystemDefined = 14;
     private const uint OtherMouseDown = 25;
     private const uint OtherMouseUp = 26;
     private const uint TapDisabledByTimeout = 0xFFFFFFFE;
@@ -123,6 +125,7 @@ public sealed partial class MacHotkeyEventSource : IHotkeyEventSource
                 (1UL << (int)KeyDown) |
                 (1UL << (int)KeyUp) |
                 (1UL << (int)FlagsChanged) |
+                (1UL << (int)SystemDefined) |
                 (1UL << (int)OtherMouseDown) |
                 (1UL << (int)OtherMouseUp);
             eventTap = CGEventTapCreate(
@@ -218,7 +221,20 @@ public sealed partial class MacHotkeyEventSource : IHotkeyEventSource
                 SourceUserDataField) == MacKeyboardInjector.SyntheticEventMarker;
             RawInputControl control;
             bool isPressed;
-            if (eventType is KeyDown or KeyUp or FlagsChanged)
+            if (eventType == SystemDefined)
+            {
+                if (MacNative.DictaCloneDecodeMediaKeyEvent(
+                        keyboardEvent,
+                        out int mediaKeyType,
+                        out int mediaKeyIsPressed) != 1 ||
+                    !MacInputMapper.TryMapMediaKey(mediaKeyType, out control))
+                {
+                    return keyboardEvent;
+                }
+
+                isPressed = mediaKeyIsPressed == 1;
+            }
+            else if (eventType is KeyDown or KeyUp or FlagsChanged)
             {
                 ushort keyCode = checked((ushort)CGEventGetIntegerValueField(
                     keyboardEvent,

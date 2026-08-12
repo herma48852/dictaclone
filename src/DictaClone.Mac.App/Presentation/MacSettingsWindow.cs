@@ -251,7 +251,7 @@ public sealed class MacSettingsWindow : Window
 
         panel.Children.Add(new TextBlock
         {
-            Text = "Use Command, Control, Option, Shift, Space, Escape, A–Z, or F1–F20. Command is stored in the existing cross-platform ‘Windows’ modifier bit for settings compatibility.",
+            Text = "Use Command, Control, Option, Shift, Space, Escape, A–Z, F1–F20, or VolumeDown. VolumeDown is the dedicated speaker-volume key and does not require Fn. Command is stored in the existing cross-platform ‘Windows’ modifier bit for settings compatibility.",
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.75,
         });

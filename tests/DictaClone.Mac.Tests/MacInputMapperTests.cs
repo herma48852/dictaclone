@@ -63,4 +63,24 @@ public sealed class MacInputMapperTests
         Assert.True(MacInputMapper.TryMapMouse(button, out var control));
         Assert.Equal(key, control.PrimaryKey);
     }
+
+    [Fact]
+    public void MediaKey_MapsVolumeDownWithoutConflatingF11()
+    {
+        Assert.True(MacInputMapper.TryMapMediaKey(1, out var mediaControl));
+        Assert.Equal(HotkeyKey.VolumeDown, mediaControl.PrimaryKey);
+
+        Assert.True(MacInputMapper.TryMapKeyboard(103, out var f11Control));
+        Assert.Equal(HotkeyKey.F11, f11Control.PrimaryKey);
+        Assert.NotEqual(mediaControl, f11Control);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(16)]
+    public void MediaKey_DoesNotMapOtherSystemControls(int mediaKeyType)
+    {
+        Assert.False(MacInputMapper.TryMapMediaKey(mediaKeyType, out _));
+    }
 }

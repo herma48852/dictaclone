@@ -149,6 +149,9 @@ the existing `Windows` modifier bit means Command on macOS. Defaults are:
 
 The event tap ignores DictaClone's own synthetic keyboard events and suppresses
 the primary key of a recognized shortcut so it does not leak into the target.
+The dedicated Volume Down media control is decoded independently from the F11
+function key and can be bound as `VolumeDown`; when bound, its press, repeats,
+and release are consumed instead of changing the system volume.
 
 Paste Mode captures the target before recording and revalidates it before
 insertion. It snapshots every pasteboard item and type as binary data, writes
@@ -186,6 +189,9 @@ no Dock icon. The menu exposes dictation state, settings, history, copy-last,
 and exit. Settings include microphone/model/language, insertion mode and delay,
 all shortcuts, vocabulary, expansions, domain, history, start at login,
 permissions, import/export, diagnostics/support bundle creation, and Smart Edit.
+The build derives a standard multi-resolution `dictaclone.icns` application
+icon from the checked-in 1024-pixel PNG for Finder, Spotlight, and Launcher;
+the Avalonia menu-bar icon continues to use its embedded PNG resource.
 
 A per-user single-instance guard prevents two copies from competing for the
 event tap or pasteboard. Enabling start at login writes
@@ -338,6 +344,15 @@ the external value, and did not restore its earlier snapshot over the newer
 owner, accepting concurrent clipboard safety. The earlier aggressive watcher
 had polled at 100 times per second and temporarily starved the global event tap;
 the 10-times-per-second qualification harness completed without that sound.
+The physical Volume Down media key was then configured as the single-key
+`VolumeDown` dictation binding. Holding it, speaking, and releasing it inserted
+the expected transcription, while system volume remained at the maximum level
+set before the test. This accepts both native media-key decoding and complete
+event suppression. After replacing the app with the ICNS-packaged build and
+refreshing LaunchServices metadata, Launcher displayed the full DictaClone
+application icon; the separate small menu-bar image continued to identify the
+running agent. The complete `scripts/macos/test.sh` suite then passed in a
+normal Terminal session.
 
 This accepts the declared personal Apple Silicon target. Cancellation,
 permission revocation, rich-text restoration, Intel hardware, Developer ID,
@@ -351,11 +366,11 @@ gates only if the target expands to broader or public distribution.
 | 0: boundary and toolchain decision | Implemented | Avalonia/native adapter architecture and pinned packages |
 | 1: shared extraction | Implemented | `DictaClone.Desktop`, shared input/error contracts, cross-platform paths |
 | 2: shell and lifecycle | Implemented; primary lifecycle accepted on Apple Silicon | menu-bar app, settings, history, overlay, and first run implemented; two forced bundle opens left one process; validated LaunchAgent launched the installed app and was removed cleanly when disabled; broader shutdown stress remains |
-| 3: hotkeys, permissions, foreground | Implemented; primary path and target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
+| 3: hotkeys, permissions, foreground | Implemented; keyboard and dedicated Volume Down hold/release paths plus target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; the global default shortcut and single-key `VolumeDown` binding worked; the bound media key did not change system volume; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
 | 4: audio and local speech | Implemented; live, quiet-speech, and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including deliberately quiet speech after schema-5 migration and an offline restart; device, silence-error, cancellation, and Intel checks remain |
 | 5: safe insertion and selected text | Implemented; primary targets and clipboard ownership safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal, restored an owned clipboard sentinel, and preserved a concurrent external change; Typing Mode left the sentinel untouched; changed-target insertion was rejected; rich text, cancellation, and selected-text checks remain |
 | 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |
-| 7: packaging and release | Implemented; local Apple Silicon deployment accepted; public distribution deferred | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle upgraded in place, retained permissions, and passed live use; Developer ID, Gatekeeper, notarization, Intel hardware, and the broader matrix apply only if distribution resumes |
+| 7: packaging and release | Implemented; local Apple Silicon deployment accepted; public distribution deferred | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle upgraded in place, retained permissions, passed live use, and displayed its generated multi-resolution icon in Launcher; Developer ID, Gatekeeper, notarization, Intel hardware, and the broader matrix apply only if distribution resumes |
 
 No Windows behavior is intentionally removed by this port. The Windows WPF app
 now references the extracted desktop presentation assembly, while its Win32 and

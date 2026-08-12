@@ -95,9 +95,9 @@ if [[ -d "$app_path/Contents/MacOS/runtimes" ]]; then
     "$app_path/Contents/Resources/app/runtimes"
 fi
 /bin/cp "$repo_root/packaging/macos/Info.plist" "$app_path/Contents/Info.plist"
-/bin/cp \
+/bin/zsh "$script_dir/build-app-icon.sh" \
   "$repo_root/src/DictaClone.Mac.App/Assets/dictaclone.png" \
-  "$app_path/Contents/Resources/dictaclone.png"
+  "$app_path/Contents/Resources/dictaclone.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app_path/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$app_path/Contents/Info.plist"
 /bin/chmod 755 "$app_path/Contents/MacOS/DictaClone.Mac.App"

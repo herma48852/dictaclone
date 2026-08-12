@@ -9,6 +9,10 @@ fi
 app_path=${1:A}
 info="$app_path/Contents/Info.plist"
 executable="$app_path/Contents/MacOS/DictaClone.Mac.App"
+icon_file=$(/usr/libexec/PlistBuddy \
+  -c "Print :CFBundleIconFile" \
+  "$info")
+icon_path="$app_path/Contents/Resources/$icon_file"
 
 /usr/bin/plutil -lint "$info"
 /usr/bin/codesign --verify --strict --verbose=2 "$app_path"
@@ -16,6 +20,12 @@ executable="$app_path/Contents/MacOS/DictaClone.Mac.App"
 
 if [[ ! -x "$executable" ]]; then
   print -u2 "Bundle executable is missing: $executable"
+  exit 66
+fi
+
+if [[ ! -s "$icon_path" ]] ||
+   ! /usr/bin/file "$icon_path" | /usr/bin/grep -q 'Mac OS X icon'; then
+  print -u2 "Bundle application icon is missing or invalid: $icon_path"
   exit 66
 fi
 

@@ -84,6 +84,12 @@ internal static partial class MacNative
     [LibraryImport(PermissionShim)]
     internal static partial void DictaCloneRequestMicrophonePermission(
         nint completion);
+
+    [LibraryImport(PermissionShim)]
+    internal static partial int DictaCloneDecodeMediaKeyEvent(
+        nint keyboardEvent,
+        out int mediaKeyType,
+        out int isPressed);
 }
 
 internal static partial class ObjectiveC

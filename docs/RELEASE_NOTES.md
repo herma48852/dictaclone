@@ -17,6 +17,13 @@ Typing Mode also preserved an exact clipboard sentinel while inserting text.
 Paste Mode restored an exact clipboard sentinel after insertion as well.
 On macOS it also preserved a newer external clipboard value written during a
 real insertion transaction.
+The dedicated macOS Volume Down media key now works as a distinct single-key
+`VolumeDown` binding rather than being conflated with F11. A live hold, speech,
+and release inserted the transcription while leaving system volume at its
+pre-test maximum. Finder and Launcher also display the packaged
+multi-resolution application icon while the running utility retains its small
+menu-bar icon and no-Dock design. The full macOS automated suite passed again
+in a normal Terminal session after these changes.
 
 ## Reliability improvements
 
@@ -44,6 +51,9 @@ real insertion transaction.
 - The signed macOS 0.1.2 upgrade retained its existing permissions, migrated
   the old default threshold to `0.006`, and inserted both normal-volume and
   deliberately quiet TextEdit dictation without the repeated failure sound.
+- A live macOS `VolumeDown` binding consumed the physical media-key press,
+  repeats, and release, completed dictation, and left system volume unchanged.
+- The rebuilt bundle's multi-resolution ICNS appeared correctly in Launcher.
 
 ## Included
 

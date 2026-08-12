@@ -34,6 +34,7 @@ xcrun clang \
   -Wextra \
   -Werror \
   -dynamiclib \
+  -framework AppKit \
   -framework ApplicationServices \
   -framework AVFoundation \
   -framework Foundation \

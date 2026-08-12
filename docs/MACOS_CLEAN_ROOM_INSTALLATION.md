@@ -154,7 +154,9 @@ test an untrusted download.
    first launch if macOS asks. A properly notarized release should identify its
    developer and must not report that the app is damaged.
 4. DictaClone starts as a menu-bar utility. It normally has no Dock icon and
-   opens its first-run settings window.
+   opens its first-run settings window. Finder, Spotlight, and Launcher show
+   the full DictaClone application icon; the smaller menu-bar image remains
+   visible while the utility is running.
 5. On **General**, select **Follow system default microphone** or a specific
    microphone, leave the local model as `base.en` for the initial check, and
    choose **Apply settings**.
@@ -217,6 +219,13 @@ target.
    the result at the original insertion point.
 4. Use `Control+Option+Escape` to cancel an active dictation. Use
    `Control+Option+Space` for clipboard-free Typing Mode.
+
+To use the single dedicated Volume Down key instead, open DictaClone Settings,
+replace the **Dictation** shortcut with `VolumeDown`, and apply the settings.
+Hold the speaker-volume-down key to dictate and release it to transcribe.
+DictaClone consumes that media-key event while it is bound, so the shortcut
+does not also lower the system volume. `F11` remains a distinct standard
+function-key binding and may require Fn under the current macOS keyboard mode.
 
 The recognized shortcut's primary key is consumed, so it should not type a
 space or invoke a command in the foreground application. Paste Mode temporarily

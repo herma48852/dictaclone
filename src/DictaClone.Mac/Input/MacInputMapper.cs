@@ -42,6 +42,21 @@ public static class MacInputMapper
         return key.HasValue;
     }
 
+    public static bool TryMapMediaKey(
+        int mediaKeyType,
+        out RawInputControl control)
+    {
+        const int SoundDown = 1;
+        if (mediaKeyType == SoundDown)
+        {
+            control = RawInputControl.ForPrimaryKey(HotkeyKey.VolumeDown);
+            return true;
+        }
+
+        control = default;
+        return false;
+    }
+
     public static bool IsModifierPressed(ushort keyCode, ulong flags)
     {
         const ulong Shift = 1UL << 17;

@@ -82,6 +82,7 @@ public enum HotkeyKey
     MouseMiddle,
     MouseButton4,
     MouseButton5,
+    VolumeDown,
 }
 
 public enum HotkeyAction
