@@ -195,14 +195,20 @@ disposing native and persistence resources.
 
 ## Build and developer checks
 
+For a complete clean checkout-to-first-dictation procedure, follow the
+[Apple Silicon source-build walkthrough](MACOS_CLEAN_ROOM_INSTALLATION.md#build-from-source-on-apple-silicon).
 Install the prerequisites once:
 
 ```zsh
-brew install --cask dotnet-sdk
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
 dotnet --version   # must resolve 10.0.302 with this repository's global.json
 xcodebuild -version
 ```
+
+Install the macOS Arm64 .NET SDK 10.0.302 from Microsoft's official download
+page before running these commands. Homebrew is optional and must still resolve
+the repository-pinned SDK version.
 
 Then restore and run the cross-platform and macOS suites:
 

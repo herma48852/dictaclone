@@ -2,13 +2,120 @@
 
 This guide installs and exercises DictaClone on a Mac or macOS user profile
 that has not run it before. DictaClone supports macOS 14 or newer on Apple
-Silicon and Intel. The release is self-contained; end users do not install the
-.NET SDK, Xcode, Homebrew, or command-line developer tools.
+Silicon and Intel. Choose either the Apple Silicon source-build path or the
+prebuilt-release path below. A prebuilt release is self-contained; source
+builders install the .NET SDK, Git, and full Xcode.
 
 An internet connection is required for the first verified speech-model
 download. Ordinary dictation works offline after the selected model is present.
 
-## Before installation
+## Build from source on Apple Silicon
+
+This is the supported way for another Mac owner to build DictaClone for
+personal use while public notarized macOS release assets are deferred. It does
+not require paid Apple Developer Program membership.
+
+### Install the source-build prerequisites
+
+Use an Apple Silicon Mac running macOS 14 or newer with enough free space for
+full Xcode and the build output. Install:
+
+- Git;
+- full Xcode from the Mac App Store, with the built-in macOS platform support;
+  and
+- the macOS Arm64 installer for .NET SDK 10.0.302 from the official
+  [.NET 10 download page](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+Homebrew is optional. The iOS, watchOS, tvOS, and visionOS Xcode components are
+not required. Select Xcode and finish its first-launch setup:
+
+```zsh
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+uname -m
+xcodebuild -version
+git --version
+```
+
+`uname -m` must report `arm64`.
+
+### Clone and test
+
+Clone the current accepted source and enter the checkout:
+
+```zsh
+git clone https://github.com/herma48852/dictaclone.git
+cd dictaclone
+dotnet --version
+git status --short --branch
+./scripts/macos/test.sh
+```
+
+From inside the checkout, `dotnet --version` must resolve SDK 10.0.302 under
+the repository's `global.json`. The first test run restores locked NuGet
+dependencies and therefore requires internet access. It does not request
+Microphone or Accessibility permission.
+
+### Sign and build
+
+The simplest local build is ad-hoc signed:
+
+```zsh
+./scripts/macos/build-app.sh osx-arm64
+```
+
+An ad-hoc build is usable on the Mac that built it, but its signing requirement
+changes when the application changes. macOS may therefore require privacy
+permissions to be granted again after a rebuild.
+
+For a stable local signing identity, sign in with an Apple Account under
+**Xcode > Settings > Apple Accounts**. Select the account, open
+**Manage Certificates**, and add an **Apple Development** certificate. A free
+[Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account)
+is sufficient for this local development use. Confirm that the certificate and
+its private key form a valid identity:
+
+```zsh
+security find-identity -v -p codesigning
+```
+
+Copy the complete identity name shown by that command and build with it:
+
+```zsh
+export DICTACLONE_CODESIGN_IDENTITY='Apple Development: Your Name (TEAMID)'
+./scripts/macos/build-app.sh osx-arm64
+```
+
+The script performs a locked restore, creates a self-contained application,
+signs it, verifies the signature, and writes the app, ZIP, and checksum under
+`artifacts/macos/<version>/osx-arm64`. It prints the exact output paths when it
+finishes. Developer ID signing, notarization, and paid program membership are
+not required for a personal source build; they are required before the owner
+distributes a prebuilt app to other people.
+
+### Install the source build
+
+Open the generated directory, using the version printed by the build. For the
+current version:
+
+```zsh
+open artifacts/macos/0.1.2/osx-arm64
+```
+
+Drag `DictaClone.app` into **Applications** before launching it. Then continue
+with [Grant permissions](#grant-permissions):
+
+```zsh
+open /Applications/DictaClone.app
+```
+
+Always launch the installed bundle through Finder, Spotlight, or `open`.
+Launching the executable inside `Contents/MacOS` directly can prevent macOS
+from associating permission requests with the application bundle.
+
+## Install a prebuilt release
+
+### Before installation
 
 Download these files from the same DictaClone release into one new folder:
 
@@ -38,7 +145,7 @@ source-tree testing only. A distributable build must have a valid Developer ID
 signature and a stapled Apple notarization ticket; do not bypass Gatekeeper to
 test an untrusted download.
 
-## Install and launch
+### Install and launch
 
 1. Double-click the specifically named DictaClone ZIP to extract it.
 2. Drag `DictaClone.app` into **Applications**. Do not run it from the archive

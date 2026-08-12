@@ -223,20 +223,29 @@ excluded from Git.
 
 macOS source builds require macOS 14 or newer, the repository-pinned .NET SDK
 10.0.302, Git, and full Xcode selected with `xcode-select`. Homebrew is only a
-convenient way to install the SDK; end users need none of these tools.
+convenient way to install the SDK; users of a prebuilt self-contained app need
+none of these tools. The complete
+[Apple Silicon source-build walkthrough](docs/MACOS_CLEAN_ROOM_INSTALLATION.md#build-from-source-on-apple-silicon)
+covers cloning, optional stable Apple Development signing, installation,
+permissions, and first dictation.
 
 ```zsh
-brew install --cask dotnet-sdk
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+git clone https://github.com/herma48852/dictaclone.git
+cd dictaclone
+dotnet --version   # 10.0.302 inside this checkout
 ./scripts/macos/test.sh
 dotnet run --project tools/DictaClone.MacProbe
-./scripts/macos/build-app.sh
+./scripts/macos/build-app.sh osx-arm64
 ```
 
 The default build is self-contained for the host architecture and ad-hoc signed
-for local testing. Set `DICTACLONE_CODESIGN_IDENTITY` to a Developer ID
-Application identity for distribution. Set `DICTACLONE_NOTARY_PROFILE` to a
-stored `notarytool` profile before running `scripts/macos/notarize-app.sh`.
+for local testing. An Apple Development identity from a free Personal Team can
+provide a more stable local privacy-permission identity. Set
+`DICTACLONE_CODESIGN_IDENTITY` to a Developer ID Application identity only for
+distribution. Set `DICTACLONE_NOTARY_PROFILE` to a stored `notarytool` profile
+before running `scripts/macos/notarize-app.sh`.
 `scripts/macos/new-release.sh` tests and builds both `osx-arm64` and `osx-x64`
 archives with checksums. When both signing and notary variables are set, it
 notarizes, staples, and repackages both archives before producing the final
