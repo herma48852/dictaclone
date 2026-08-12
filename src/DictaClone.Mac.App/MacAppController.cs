@@ -483,7 +483,7 @@ public sealed class MacAppController : IAsyncDisposable
     private void SettingsWindowActivated(object? sender, EventArgs eventArgs) =>
         _settingsWindow?.UpdatePermissions(_permissions.Inspect());
 
-    private void CopyLastResult()
+    private async void CopyLastResult()
     {
         if (string.IsNullOrWhiteSpace(_dictation.LastTranscript))
         {
@@ -491,8 +491,9 @@ public sealed class MacAppController : IAsyncDisposable
             return;
         }
 
-        _insertion.CopyText(_dictation.LastTranscript);
-        _overlay.ShowStatus(OverlayStatus.Success, "✓  Last result copied");
+        await CopyTextAsync(
+            _dictation.LastTranscript,
+            "✓  Last result copied").ConfigureAwait(true);
     }
 
     private async Task ShowHistoryAsync()
@@ -502,10 +503,11 @@ public sealed class MacAppController : IAsyncDisposable
         if (_historyWindow is null)
         {
             _historyWindow = new();
-            _historyWindow.CopyRequested += (_, eventArgs) =>
+            _historyWindow.CopyRequested += async (_, eventArgs) =>
             {
-                _insertion.CopyText(eventArgs.Text);
-                _overlay.ShowStatus(OverlayStatus.Success, "✓  Transcript copied");
+                await CopyTextAsync(
+                    eventArgs.Text,
+                    "✓  Transcript copied").ConfigureAwait(true);
             };
             _historyWindow.ClearRequested += async (_, _) =>
             {
@@ -633,6 +635,27 @@ public sealed class MacAppController : IAsyncDisposable
         catch (Exception)
         {
             // Diagnostics must never break dictation or shutdown.
+        }
+    }
+
+    private async Task CopyTextAsync(string text, string successMessage)
+    {
+        try
+        {
+            bool copied = await _insertion.TryCopyTextAsync(
+                text,
+                CancellationToken.None).ConfigureAwait(true);
+            _overlay.ShowStatus(
+                copied ? OverlayStatus.Success : OverlayStatus.Failure,
+                copied
+                    ? successMessage
+                    : "Clipboard is busy; try copying again");
+        }
+        catch (Exception)
+        {
+            _overlay.ShowStatus(
+                OverlayStatus.Failure,
+                "Could not copy text to the clipboard");
         }
     }
 

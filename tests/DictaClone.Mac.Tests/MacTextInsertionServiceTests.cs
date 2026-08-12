@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using DictaClone.Core.Dictation;
 using DictaClone.Core.Settings;
 using DictaClone.Mac.Insertion;
@@ -53,6 +54,116 @@ public sealed class MacTextInsertionServiceTests
     }
 
     [Fact]
+    public async Task PasteMode_AbortsIfPasteboardChangesDuringReadyWindow()
+    {
+        var pasteboard = new FakePasteboard();
+        bool readyWindow = true;
+        var service = new MacTextInsertionService(
+            pasteboard,
+            new FakeKeyboard(),
+            (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (readyWindow)
+                {
+                    readyWindow = false;
+                    pasteboard.ChangeExternally();
+                }
+
+                return Task.CompletedTask;
+            });
+
+        await Assert.ThrowsAsync<ClipboardContentionException>(() =>
+            service.InsertAsync(
+                "replacement",
+                Target,
+                new(TextInsertionMode.Paste, TimeSpan.Zero),
+                CancellationToken.None));
+
+        Assert.False(pasteboard.Restored);
+    }
+
+    [Fact]
+    public async Task PasteMode_DefaultRetryWindow_OutlastsBriefPasteboardOwner()
+    {
+        var pasteboard = new FakePasteboard
+        {
+            CaptureFailuresRemaining = 6,
+        };
+        var delays = new List<TimeSpan>();
+        var service = new MacTextInsertionService(
+            pasteboard,
+            new FakeKeyboard(),
+            (delay, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                delays.Add(delay);
+                return Task.CompletedTask;
+            });
+
+        await service.InsertAsync(
+            "replacement",
+            Target,
+            new(TextInsertionMode.Paste, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.Equal(7, pasteboard.CaptureCalls);
+        Assert.Equal(
+            [25, 50, 75, 100, 125, 150],
+            delays.Take(6).Select(delay => (int)delay.TotalMilliseconds));
+        Assert.True(pasteboard.Restored);
+    }
+
+    [Fact]
+    public async Task CopyText_RetriesTransientPasteboardContention()
+    {
+        var pasteboard = new FakePasteboard
+        {
+            SetTextFailuresRemaining = 6,
+        };
+        var delays = new List<TimeSpan>();
+        var service = new MacTextInsertionService(
+            pasteboard,
+            new FakeKeyboard(),
+            (delay, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                delays.Add(delay);
+                return Task.CompletedTask;
+            });
+
+        bool copied = await service.TryCopyTextAsync(
+            "recovered",
+            CancellationToken.None);
+
+        Assert.True(copied);
+        Assert.Equal(7, pasteboard.SetTextCalls);
+        Assert.Equal(
+            [25, 50, 75, 100, 125, 150],
+            delays.Select(delay => (int)delay.TotalMilliseconds));
+    }
+
+    [Fact]
+    public async Task CopyText_ReportsPersistentPasteboardContention()
+    {
+        var pasteboard = new FakePasteboard
+        {
+            SetTextFailuresRemaining = 10,
+        };
+        var service = new MacTextInsertionService(
+            pasteboard,
+            new FakeKeyboard(),
+            NoDelay);
+
+        bool copied = await service.TryCopyTextAsync(
+            "blocked",
+            CancellationToken.None);
+
+        Assert.False(copied);
+        Assert.Equal(10, pasteboard.SetTextCalls);
+    }
+
+    [Fact]
     public async Task TypingMode_PreservesGraphemesAndLeavesPasteboardUntouched()
     {
         var pasteboard = new FakePasteboard();
@@ -95,10 +206,33 @@ public sealed class MacTextInsertionServiceTests
 
         public bool Restored { get; private set; }
 
-        public MacPasteboardSnapshot Capture() => _original;
+        public int CaptureCalls { get; private set; }
+
+        public int CaptureFailuresRemaining { get; set; }
+
+        public int SetTextCalls { get; private set; }
+
+        public int SetTextFailuresRemaining { get; set; }
+
+        public MacPasteboardSnapshot Capture()
+        {
+            CaptureCalls++;
+            if (CaptureFailuresRemaining-- > 0)
+            {
+                throw new FakePasteboardBusyException();
+            }
+
+            return _original;
+        }
 
         public void SetText(string text)
         {
+            SetTextCalls++;
+            if (SetTextFailuresRemaining-- > 0)
+            {
+                throw new FakePasteboardBusyException();
+            }
+
             Items = [[new("public.utf8-plain-text", System.Text.Encoding.UTF8.GetBytes(text))]];
             ChangeCount++;
         }
@@ -112,6 +246,9 @@ public sealed class MacTextInsertionServiceTests
 
         public void ChangeExternally() => ChangeCount++;
     }
+
+    private sealed class FakePasteboardBusyException()
+        : ExternalException("busy");
 
     private sealed class FakeKeyboard(Action? onPaste = null) : IMacKeyboardInjector
     {

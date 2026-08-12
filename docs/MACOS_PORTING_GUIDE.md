@@ -32,7 +32,10 @@ The local development qualification now passes with repository-pinned .NET SDK
 packaged executables pass their non-UI smoke test (the Intel check uses Rosetta
 on the Apple-silicon build host). The adapter test assembly also builds without
 warnings. On August 11, 2026, all cross-platform and macOS automated suites
-passed from `scripts/macos/test.sh` in a normal Terminal session. The same day,
+passed from `scripts/macos/test.sh` in a normal Terminal session. On August 12,
+the suite passed again after rebasing onto v0.1.2 and adding macOS regressions
+for the extended clipboard retry policy. The same qualification run also built
+and smoke-tested the `0.1.2` Apple Silicon bundle. On August 11,
 an Apple-Development-signed, hardened-runtime `osx-arm64` bundle completed the
 primary interactive path on Apple Silicon: LaunchServices bundle launch,
 Microphone and Accessibility authorization, the `Control+Shift+Space` global
@@ -151,6 +154,11 @@ insertion. It snapshots every pasteboard item and type as binary data, writes
 the result, sends Command-V, and restores the snapshot only while DictaClone
 still owns the pasteboard transaction. A concurrent user or application change
 is never overwritten. Temporary pasteboard failures use bounded retries.
+Version 0.1.2 aligns macOS with the hardened Windows policy: ten incremental
+retry attempts cover approximately 1.1 seconds, and the menu commands for
+copying the last result or a history entry use the same asynchronous policy.
+Persistent contention produces an actionable failure instead of blocking the
+menu-bar UI.
 
 Typing Mode never reads or changes the pasteboard. It sends Unicode by composed
 grapheme so emoji and combining characters are not split, maps newlines and tabs
@@ -327,7 +335,7 @@ ID, Gatekeeper, and notarization still need their listed acceptance runs.
 | 2: shell and lifecycle | Implemented; primary lifecycle accepted on Apple Silicon | menu-bar app, settings, history, overlay, and first run implemented; two forced bundle opens left one process; validated LaunchAgent launched the installed app and was removed cleanly when disabled; broader shutdown stress remains |
 | 3: hotkeys, permissions, foreground | Implemented; primary path and target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
 | 4: audio and local speech | Implemented; live and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including after an offline restart; device, silence, cancellation, and Intel checks remain |
-| 5: safe insertion and selected text | Implemented; primary targets and core clipboard safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal and restored an exact clipboard sentinel; Typing Mode left the sentinel untouched; changed-target insertion was rejected; clipboard concurrency, rich text, cancellation, and selected-text checks remain |
+| 5: safe insertion and selected text | Implemented; primary targets and core clipboard safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal and restored an exact clipboard sentinel; Typing Mode left the sentinel untouched; changed-target insertion was rejected; v0.1.2 adds the extended asynchronous clipboard retry policy; clipboard concurrency, rich text, cancellation, and selected-text checks remain |
 | 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |
 | 7: packaging and release | Implemented; development-signed Apple Silicon path accepted; distribution acceptance pending | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle installed and launched successfully; Developer ID, Gatekeeper, notarization, Intel hardware, and the remaining manual matrix remain |
 

@@ -24,13 +24,15 @@ Paste Mode restored an exact clipboard sentinel after insertion as well.
   `0.012` default while preserving thresholds the user customized.
 - Paste Mode now retries transient clipboard contention for approximately 1.1
   seconds with bounded incremental backoff. Copying the last result and copying
-  transcript-history entries use the same resilient behavior.
+  transcript-history entries use the same resilient behavior on Windows and
+  macOS without blocking the macOS menu-bar UI.
 - Capture failures now distinguish an empty microphone stream, audio below the
   silence threshold, and speech that Whisper captured but could not recognize.
   These messages remain privacy-safe and contain no audio or transcript text.
 - Automated regressions cover quiet speech that the former default rejected,
-  extended clipboard contention, schema migration, and the distinct capture
-  failure messages.
+  extended clipboard contention on both platforms, schema migration, and the
+  distinct capture failure messages. The complete macOS suite passed in a
+  normal Terminal session after the v0.1.2 rebase and parity changes.
 
 ## Live compatibility confirmation
 

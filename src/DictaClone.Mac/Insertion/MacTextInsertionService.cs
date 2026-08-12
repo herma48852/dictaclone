@@ -8,7 +8,9 @@ namespace DictaClone.Mac.Insertion;
 
 public sealed class MacTextInsertionService : ITextInsertionService
 {
-    private const int ClipboardAttempts = 5;
+    private const int ClipboardAttempts = 10;
+    private static readonly TimeSpan ClipboardRetryDelay =
+        TimeSpan.FromMilliseconds(25);
     private static readonly TimeSpan ClipboardReadyDelay =
         TimeSpan.FromMilliseconds(25);
     private static readonly TimeSpan ClipboardRestoreDelay =
@@ -62,16 +64,45 @@ public sealed class MacTextInsertionService : ITextInsertionService
         };
     }
 
-    public void CopyText(string text) => _pasteboard.SetText(text);
+    public async Task<bool> TryCopyTextAsync(
+        string text,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        for (int attempt = 0; attempt < ClipboardAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                _pasteboard.SetText(text);
+                return true;
+            }
+            catch (ExternalException) when (attempt + 1 < ClipboardAttempts)
+            {
+                await _delay(
+                    TimeSpan.FromTicks(
+                        ClipboardRetryDelay.Ticks * (attempt + 1L)),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (ExternalException)
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
 
     private async Task PasteAsync(
         string text,
         CancellationToken cancellationToken)
     {
-        MacPasteboardSnapshot snapshot = CaptureStable(cancellationToken);
-        ExecuteWithRetry(
+        MacPasteboardSnapshot snapshot = await CaptureStableAsync(
+            cancellationToken).ConfigureAwait(false);
+        await ExecuteWithRetryAsync(
             () => _pasteboard.SetText(text),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         long insertionSequence = _pasteboard.ChangeCount;
 
         try
@@ -87,6 +118,10 @@ public sealed class MacTextInsertionService : ITextInsertionService
             await _delay(ClipboardRestoreDelay, cancellationToken)
                 .ConfigureAwait(false);
         }
+        catch (ClipboardContentionException)
+        {
+            throw;
+        }
         catch (Exception exception)
             when (exception is ExternalException or InvalidOperationException)
         {
@@ -96,9 +131,9 @@ public sealed class MacTextInsertionService : ITextInsertionService
         {
             if (_pasteboard.ChangeCount == insertionSequence)
             {
-                ExecuteWithRetry(
+                await ExecuteWithRetryAsync(
                     () => _pasteboard.Restore(snapshot),
-                    CancellationToken.None);
+                    CancellationToken.None).ConfigureAwait(false);
             }
         }
     }
@@ -148,7 +183,7 @@ public sealed class MacTextInsertionService : ITextInsertionService
         }
     }
 
-    private MacPasteboardSnapshot CaptureStable(
+    private async Task<MacPasteboardSnapshot> CaptureStableAsync(
         CancellationToken cancellationToken)
     {
         Exception? lastException = null;
@@ -169,13 +204,14 @@ public sealed class MacTextInsertionService : ITextInsertionService
                 lastException = exception;
             }
 
-            WaitBeforeRetry(attempt, cancellationToken);
+            await DelayBeforeRetryAsync(attempt, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         throw new ClipboardContentionException(lastException);
     }
 
-    private static void ExecuteWithRetry(
+    private async Task ExecuteWithRetryAsync(
         Action operation,
         CancellationToken cancellationToken)
     {
@@ -193,25 +229,24 @@ public sealed class MacTextInsertionService : ITextInsertionService
                 lastException = exception;
             }
 
-            WaitBeforeRetry(attempt, cancellationToken);
+            await DelayBeforeRetryAsync(attempt, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         throw new ClipboardContentionException(lastException);
     }
 
-    private static void WaitBeforeRetry(
+    private Task DelayBeforeRetryAsync(
         int attempt,
         CancellationToken cancellationToken)
     {
         if (attempt + 1 >= ClipboardAttempts)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        TimeSpan delay = TimeSpan.FromMilliseconds(15 * (attempt + 1));
-        if (cancellationToken.WaitHandle.WaitOne(delay))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-        }
+        TimeSpan delay = TimeSpan.FromTicks(
+            ClipboardRetryDelay.Ticks * (attempt + 1L));
+        return _delay(delay, cancellationToken);
     }
 }
