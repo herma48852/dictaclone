@@ -76,8 +76,17 @@ packaged-app smoke checks, and all cross-platform/macOS automated test suites
 pass in a normal Terminal session. On August 11, 2026, an
 Apple-Development-signed Apple Silicon bundle also passed the primary live
 workflow: Microphone and Accessibility authorization, global shortcut capture,
-local transcription, and Paste Mode insertion into TextEdit and native GNU
-Emacs. Final qualification still requires the rest of the interactive
+local transcription, and Paste Mode insertion into TextEdit, native GNU Emacs,
+browser fields, and Terminal. Typing Mode also completed a live insertion.
+An offline restart and subsequent local TextEdit dictation also succeeded.
+Two forced bundle opens also left exactly one running process.
+The validated per-user LaunchAgent successfully launched the installed app.
+Disabling start-at-login then removed the registration cleanly.
+Changing from TextEdit to a browser during dictation correctly inserted into
+neither target.
+Typing Mode inserted text without changing an exact clipboard sentinel.
+Paste Mode also restored an exact clipboard sentinel after insertion.
+Final qualification still requires the rest of the interactive
 clean-room matrix, a Developer ID distribution identity, and Apple
 notarization.
 
@@ -95,7 +104,7 @@ installation, permissions, offline use, acceptance, and removal.
 
 - Windows 11 x64: WPF/Win32/NAudio, implemented and automatically qualified.
 - macOS 14+ on Apple Silicon and Intel: Avalonia/native Apple APIs, implemented;
-  automated bundles and the development-signed Apple Silicon TextEdit/Emacs
+  automated bundles and the development-signed Apple Silicon primary insertion
   workflow are qualified, with the broader interactive and distribution matrix
   pending.
 - C# 14 and .NET 10, local Whisper speech recognition, and self-contained

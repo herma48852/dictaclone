@@ -1,6 +1,6 @@
 # DictaClone macOS porting guide
 
-Last reviewed: August 11, 2026
+Last reviewed: August 12, 2026
 
 ## Current decision and status
 
@@ -37,12 +37,13 @@ an Apple-Development-signed, hardened-runtime `osx-arm64` bundle completed the
 primary interactive path on Apple Silicon: LaunchServices bundle launch,
 Microphone and Accessibility authorization, the `Control+Shift+Space` global
 shortcut, live microphone capture, local transcription, and Paste Mode
-insertion into TextEdit and native GNU Emacs. DictaClone also transcribed text
-entered into the project's live development session. The broader
-denial/revocation, offline, lifecycle, insertion-mode, application, and Intel
-portions of the acceptance matrix remain. Developer ID signing and Apple
-notarization additionally require the release owner's distribution certificate
-and notary profile.
+insertion into TextEdit, native GNU Emacs, browser fields, and Terminal.
+DictaClone also transcribed text entered into the project's live development
+session. After the model download, an offline restart and another TextEdit
+dictation succeeded. The broader denial/revocation, lifecycle, insertion-mode,
+application, and Intel portions of the acceptance matrix remain. Developer ID
+signing and Apple notarization additionally require the release owner's
+distribution certificate and notary profile.
 
 ## Supported target
 
@@ -286,7 +287,7 @@ the following manual checks on a normal signed build:
 
 Follow `MACOS_CLEAN_ROOM_INSTALLATION.md` for the end-user acceptance run.
 
-### Interactive qualification recorded August 11, 2026
+### Interactive qualification recorded August 11–12, 2026
 
 The Apple Silicon qualification build used the stable designated requirement
 from an Apple Development certificate, the hardened runtime, and the packaged
@@ -294,14 +295,28 @@ JIT and audio-input entitlements. After one TCC reset for
 `com.dictaclone.desktop`, macOS reported Microphone and Accessibility as
 authorized. Input Monitoring remained optional. Holding and releasing the
 default shortcut transcribed speech locally and inserted the result into
-TextEdit and native GNU Emacs without the earlier repeated permission-failure
-sound.
+TextEdit, native GNU Emacs, browser fields, and Terminal without the earlier
+repeated permission-failure sound. Clipboard-free Typing Mode also inserted a
+live transcription successfully and preserved an exact clipboard sentinel.
+After the model was downloaded, DictaClone quit, relaunched without a network
+connection, and completed another TextEdit dictation successfully. Two
+consecutive forced LaunchServices opens still left exactly one running
+DictaClone process, accepting the single-instance guard.
+The generated per-user LaunchAgent passed `plutil` validation and a clean
+`launchctl bootstrap` launched one installed DictaClone process, accepting the
+enable/start half of the login-item workflow. Disabling the setting then
+removed the owned LaunchAgent cleanly, completing the login-item lifecycle.
+Starting dictation in TextEdit, switching to a browser before release, and then
+releasing inserted into neither application, accepting target-change rejection.
+Typing Mode inserted a live transcription while preserving an exact clipboard
+sentinel, accepting its clipboard-isolation property.
+Paste Mode also inserted a live transcription and restored the exact clipboard
+sentinel afterward, accepting ordinary pasteboard restoration.
 
 This accepts the primary end-to-end path, not the entire matrix above. In
-particular, Typing Mode, cancellation, target changes, permission revocation,
-clipboard concurrency, browser and Terminal fields, rich-text behavior,
-offline restart, login-item behavior, Intel hardware, Developer ID, Gatekeeper,
-and notarization still need their listed acceptance runs.
+particular, cancellation (deferred by tester choice), permission revocation,
+Paste Mode clipboard concurrency, rich-text behavior, Intel hardware, Developer
+ID, Gatekeeper, and notarization still need their listed acceptance runs.
 
 ## Milestone record
 
@@ -309,10 +324,10 @@ and notarization still need their listed acceptance runs.
 | --- | --- | --- |
 | 0: boundary and toolchain decision | Implemented | Avalonia/native adapter architecture and pinned packages |
 | 1: shared extraction | Implemented | `DictaClone.Desktop`, shared input/error contracts, cross-platform paths |
-| 2: shell and lifecycle | Implemented | menu-bar app, settings, history, overlay, first run, single instance |
-| 3: hotkeys, permissions, foreground | Implemented; primary path accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; denial/revocation and target-change matrix remains |
-| 4: audio and local speech | Implemented; primary path accepted on Apple Silicon | live Core Audio capture and local transcription succeeded; device, silence, cancellation, offline-restart, and Intel checks remain |
-| 5: safe insertion and selected text | Implemented; TextEdit and Emacs Paste Mode accepted | transcribed text inserted into the original TextEdit and native GNU Emacs targets; Typing Mode, other targets, clipboard concurrency, and selected-text matrix remains |
+| 2: shell and lifecycle | Implemented; primary lifecycle accepted on Apple Silicon | menu-bar app, settings, history, overlay, and first run implemented; two forced bundle opens left one process; validated LaunchAgent launched the installed app and was removed cleanly when disabled; broader shutdown stress remains |
+| 3: hotkeys, permissions, foreground | Implemented; primary path and target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
+| 4: audio and local speech | Implemented; live and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including after an offline restart; device, silence, cancellation, and Intel checks remain |
+| 5: safe insertion and selected text | Implemented; primary targets and core clipboard safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal and restored an exact clipboard sentinel; Typing Mode left the sentinel untouched; changed-target insertion was rejected; clipboard concurrency, rich text, cancellation, and selected-text checks remain |
 | 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |
 | 7: packaging and release | Implemented; development-signed Apple Silicon path accepted; distribution acceptance pending | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle installed and launched successfully; Developer ID, Gatekeeper, notarization, Intel hardware, and the remaining manual matrix remain |
 

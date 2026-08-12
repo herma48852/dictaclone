@@ -4,9 +4,18 @@ Release status: pre-release qualification build for Windows 11 x64. A macOS
 14+ port is implemented; Apple-silicon and Intel development bundles pass
 build, signature, and packaged-app smoke checks, and its automated suites pass
 in a normal Terminal session. An Apple-Development-signed Apple Silicon bundle
-also passes the primary live permission, dictation, and Paste Mode workflow in
-TextEdit and native GNU Emacs. The broader interactive matrix, Developer ID,
-and notarization qualification remain.
+also passes the primary live permission and dictation workflow, with Paste Mode
+in TextEdit, native GNU Emacs, a browser field, and Terminal plus a successful
+Typing Mode insertion. The broader interactive matrix, Developer ID, and
+notarization qualification remain. A post-download offline restart and TextEdit
+dictation also succeeded, and forced repeated bundle opens left one process.
+The generated per-user LaunchAgent also passed validation and launched the
+installed application when bootstrapped; disabling the setting removed it
+cleanly.
+Changing the focused application during dictation also correctly rejected
+insertion into both the original and replacement targets.
+Typing Mode also preserved an exact clipboard sentinel while inserting text.
+Paste Mode restored an exact clipboard sentinel after insertion as well.
 
 ## Reliability improvements
 
@@ -81,7 +90,7 @@ and notarization qualification remain.
 - Smart Edit requires network access and a separately supplied provider API
   key. Ordinary dictation stays local and works offline after model download.
 - The macOS app is not yet a public release artifact. Its development-signed
-  Apple Silicon TextEdit/Emacs workflow is qualified, but the remaining
+  Apple Silicon primary insertion workflow is qualified, but the remaining
   interactive and Intel-hardware matrix still requires completion together
   with a Developer ID-signed and Apple-notarized bundle. The .NET 10/Xcode
   development builds and smoke checks pass for both supported architectures.
