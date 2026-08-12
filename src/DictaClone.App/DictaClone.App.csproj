@@ -35,6 +35,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="../../LICENSE"
+          Link="LICENSE"
+          CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../legal/THIRD-PARTY-NOTICES.md"
           Link="THIRD-PARTY-NOTICES.md"
           CopyToPublishDirectory="PreserveNewest" />

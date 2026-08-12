@@ -6,9 +6,8 @@ build, signature, and packaged-app smoke checks, and its automated suites pass
 in a normal Terminal session. An Apple-Development-signed Apple Silicon bundle
 also passes the primary live permission and dictation workflow, with Paste Mode
 in TextEdit, native GNU Emacs, a browser field, and Terminal plus a successful
-Typing Mode insertion. The broader interactive matrix, Developer ID, and
-notarization qualification remain. A post-download offline restart and TextEdit
-dictation also succeeded, and forced repeated bundle opens left one process.
+Typing Mode insertion. A post-download offline restart and TextEdit dictation
+also succeeded, and forced repeated bundle opens left one process.
 The generated per-user LaunchAgent also passed validation and launched the
 installed application when bootstrapped; disabling the setting removed it
 cleanly.
@@ -16,6 +15,8 @@ Changing the focused application during dictation also correctly rejected
 insertion into both the original and replacement targets.
 Typing Mode also preserved an exact clipboard sentinel while inserting text.
 Paste Mode restored an exact clipboard sentinel after insertion as well.
+On macOS it also preserved a newer external clipboard value written during a
+real insertion transaction.
 
 ## Reliability improvements
 
@@ -40,6 +41,9 @@ Paste Mode restored an exact clipboard sentinel after insertion as well.
   Notepad without reproducing the previous clipboard failure.
 - Normal dictation was transcribed and inserted into Codex CLI through Windows
   Terminal without reproducing the previous false no-speech result.
+- The signed macOS 0.1.2 upgrade retained its existing permissions, migrated
+  the old default threshold to `0.006`, and inserted both normal-volume and
+  deliberately quiet TextEdit dictation without the repeated failure sound.
 
 ## Included
 
@@ -92,7 +96,8 @@ Paste Mode restored an exact clipboard sentinel after insertion as well.
 - Smart Edit requires network access and a separately supplied provider API
   key. Ordinary dictation stays local and works offline after model download.
 - The macOS app is not yet a public release artifact. Its development-signed
-  Apple Silicon primary insertion workflow is qualified, but the remaining
-  interactive and Intel-hardware matrix still requires completion together
-  with a Developer ID-signed and Apple-notarized bundle. The .NET 10/Xcode
-  development builds and smoke checks pass for both supported architectures.
+  Apple Silicon primary workflow is accepted for personal use on the
+  qualification Mac. Public distribution is deferred by owner choice; if it
+  resumes, the Intel/cross-machine matrix and a Developer ID-signed,
+  Apple-notarized bundle are required. The .NET 10/Xcode development builds and
+  smoke checks pass for both supported architectures.

@@ -1,9 +1,9 @@
 # DictaClone
 
 DictaClone is a local-first voice-to-text application for Windows 11 x64 with a
-macOS 14+ port now in qualification. Its workflow is simple: hold a global
-shortcut, speak, release it, and insert the transcription wherever the text
-cursor is active.
+macOS 14+ port qualified for local Apple Silicon use. Its workflow is simple:
+hold a global shortcut, speak, release it, and insert the transcription wherever
+the text cursor is active.
 
 The project provides local Whisper transcription, a tray or menu-bar interface,
 configurable shortcuts, clipboard and character-by-character insertion modes,
@@ -86,9 +86,11 @@ Changing from TextEdit to a browser during dictation correctly inserted into
 neither target.
 Typing Mode inserted text without changing an exact clipboard sentinel.
 Paste Mode also restored an exact clipboard sentinel after insertion.
-Final qualification still requires the rest of the interactive
-clean-room matrix, a Developer ID distribution identity, and Apple
-notarization.
+Paste Mode preserved a newer external clipboard change made during insertion.
+The owner has accepted this Apple Silicon build for personal use on the
+qualification Mac. Public macOS distribution is not currently required, so the
+remaining optional matrix, Developer ID identity, Intel-hardware run, and Apple
+notarization are explicitly deferred.
 
 See the [Windows clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
 for downloading the qualified GitHub release assets, checksum verification,
@@ -105,8 +107,8 @@ installation, permissions, offline use, acceptance, and removal.
 - Windows 11 x64: WPF/Win32/NAudio, implemented and automatically qualified.
 - macOS 14+ on Apple Silicon and Intel: Avalonia/native Apple APIs, implemented;
   automated bundles and the development-signed Apple Silicon primary insertion
-  workflow are qualified, with the broader interactive and distribution matrix
-  pending.
+  workflow are qualified for local use. Public distribution and its broader
+  cross-machine matrix are deferred by owner choice.
 - C# 14 and .NET 10, local Whisper speech recognition, and self-contained
   end-user packages on both platforms.
 
@@ -242,4 +244,4 @@ checksums.
 
 ## License
 
-A project license has not yet been selected.
+DictaClone is licensed under the [MIT License](LICENSE).

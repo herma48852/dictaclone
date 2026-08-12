@@ -43,10 +43,11 @@ shortcut, live microphone capture, local transcription, and Paste Mode
 insertion into TextEdit, native GNU Emacs, browser fields, and Terminal.
 DictaClone also transcribed text entered into the project's live development
 session. After the model download, an offline restart and another TextEdit
-dictation succeeded. The broader denial/revocation, lifecycle, insertion-mode,
-application, and Intel portions of the acceptance matrix remain. Developer ID
-signing and Apple notarization additionally require the release owner's
-distribution certificate and notary profile.
+dictation succeeded. The owner accepted the development-signed Apple Silicon
+build for continued personal use on this Mac. Public macOS distribution and
+the remaining optional/cross-machine matrix are deferred; they do not block the
+declared local target. Future direct distribution would require a Developer ID
+Application certificate and Apple notarization.
 
 ## Supported target
 
@@ -320,11 +321,22 @@ Typing Mode inserted a live transcription while preserving an exact clipboard
 sentinel, accepting its clipboard-isolation property.
 Paste Mode also inserted a live transcription and restored the exact clipboard
 sentinel afterward, accepting ordinary pasteboard restoration.
+After upgrading the installed qualification app from 0.1.1 to the
+Apple-Development-signed 0.1.2 bundle, the stable identity retained Microphone
+and Accessibility authorization. Schema-5 migration changed the former default
+silence threshold from `0.012` to `0.006`, and both normal-volume and deliberately
+quiet TextEdit dictation succeeded without the repeated failure sound.
+A low-frequency external pasteboard writer then changed the clipboard during a
+real Paste Mode transaction. DictaClone inserted the transcription, retained
+the external value, and did not restore its earlier snapshot over the newer
+owner, accepting concurrent clipboard safety. The earlier aggressive watcher
+had polled at 100 times per second and temporarily starved the global event tap;
+the 10-times-per-second qualification harness completed without that sound.
 
-This accepts the primary end-to-end path, not the entire matrix above. In
-particular, cancellation (deferred by tester choice), permission revocation,
-Paste Mode clipboard concurrency, rich-text behavior, Intel hardware, Developer
-ID, Gatekeeper, and notarization still need their listed acceptance runs.
+This accepts the declared personal Apple Silicon target. Cancellation,
+permission revocation, rich-text restoration, Intel hardware, Developer ID,
+Gatekeeper, and notarization were deferred by owner choice. They remain future
+gates only if the target expands to broader or public distribution.
 
 ## Milestone record
 
@@ -334,10 +346,10 @@ ID, Gatekeeper, and notarization still need their listed acceptance runs.
 | 1: shared extraction | Implemented | `DictaClone.Desktop`, shared input/error contracts, cross-platform paths |
 | 2: shell and lifecycle | Implemented; primary lifecycle accepted on Apple Silicon | menu-bar app, settings, history, overlay, and first run implemented; two forced bundle opens left one process; validated LaunchAgent launched the installed app and was removed cleanly when disabled; broader shutdown stress remains |
 | 3: hotkeys, permissions, foreground | Implemented; primary path and target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; global hold/release shortcut worked; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
-| 4: audio and local speech | Implemented; live and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including after an offline restart; device, silence, cancellation, and Intel checks remain |
-| 5: safe insertion and selected text | Implemented; primary targets and core clipboard safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal and restored an exact clipboard sentinel; Typing Mode left the sentinel untouched; changed-target insertion was rejected; v0.1.2 adds the extended asynchronous clipboard retry policy; clipboard concurrency, rich text, cancellation, and selected-text checks remain |
+| 4: audio and local speech | Implemented; live, quiet-speech, and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including deliberately quiet speech after schema-5 migration and an offline restart; device, silence-error, cancellation, and Intel checks remain |
+| 5: safe insertion and selected text | Implemented; primary targets and clipboard ownership safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal, restored an owned clipboard sentinel, and preserved a concurrent external change; Typing Mode left the sentinel untouched; changed-target insertion was rejected; rich text, cancellation, and selected-text checks remain |
 | 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |
-| 7: packaging and release | Implemented; development-signed Apple Silicon path accepted; distribution acceptance pending | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle installed and launched successfully; Developer ID, Gatekeeper, notarization, Intel hardware, and the remaining manual matrix remain |
+| 7: packaging and release | Implemented; local Apple Silicon deployment accepted; public distribution deferred | automated tests and dual-RID packaged smoke checks pass; an Apple-Development-signed arm64 bundle upgraded in place, retained permissions, and passed live use; Developer ID, Gatekeeper, notarization, Intel hardware, and the broader matrix apply only if distribution resumes |
 
 No Windows behavior is intentionally removed by this port. The Windows WPF app
 now references the extracted desktop presentation assembly, while its Win32 and

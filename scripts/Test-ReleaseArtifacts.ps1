@@ -102,6 +102,7 @@ try {
         'DictaClone.App.dll',
         'coreclr.dll',
         'hostfxr.dll',
+        'LICENSE',
         'THIRD-PARTY-NOTICES.md',
         'MODEL-LICENSES.md',
         'RELEASE_NOTES.md',
