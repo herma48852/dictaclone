@@ -29,9 +29,11 @@ if [[ ! -s "$icon_path" ]] ||
   exit 66
 fi
 
-signature_info=$(/usr/bin/codesign -dv "$app_path" 2>&1)
+signature_info=$(/usr/bin/codesign -dvvv "$app_path" 2>&1)
 if [[ "$signature_info" == *'Signature=adhoc'* ]]; then
   print "Skipping Gatekeeper assessment for an ad-hoc development signature."
+elif [[ "$signature_info" == *'Authority=Apple Development:'* ]]; then
+  print "Skipping Gatekeeper assessment for an Apple Development signature."
 else
   /usr/sbin/spctl --assess --type execute --verbose=2 "$app_path"
 fi

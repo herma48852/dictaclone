@@ -4,5 +4,5 @@ public static class ProductInfo
 {
     public static string Name { get; } = "DictaClone";
 
-    public static Version DevelopmentVersion { get; } = new(0, 1, 2);
+    public static Version DevelopmentVersion { get; } = new(0, 1, 3);
 }

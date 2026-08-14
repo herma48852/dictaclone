@@ -7,30 +7,70 @@ namespace DictaClone.Mac.Tests;
 public sealed class MacForegroundAndSelectionTests
 {
     [Fact]
-    public async Task ForegroundTarget_RejectsChangedWindowWithinApplication()
+    public async Task ForegroundTarget_RejectsChangedControlWithinApplication()
     {
         var native = new FakeForegroundApi(new(
             42,
             100,
+            90,
             "TextEdit",
             "com.apple.TextEdit"));
         var service = new MacForegroundTargetService(native);
 
         ForegroundTarget captured = await service.CaptureAsync(
             CancellationToken.None);
-        Assert.Equal("0000002A:0000000000000064", captured.Id);
+        Assert.Equal("0000002A:E:0000000000000064", captured.Id);
         Assert.True(await service.IsCurrentAsync(captured, CancellationToken.None));
 
-        native.Snapshot = native.Snapshot with { FocusedWindowHash = 101 };
+        native.Snapshot = native.Snapshot with { FocusedElementHash = 101 };
         Assert.False(await service.IsCurrentAsync(captured, CancellationToken.None));
     }
 
     [Fact]
-    public async Task ForegroundTarget_RejectsMissingFocusedWindowIdentity()
+    public async Task ForegroundTarget_ReportsMissingAccessibilityPermission()
+    {
+        var native = new FakeForegroundApi(new(
+            42,
+            100,
+            90,
+            "TextEdit",
+            "com.apple.TextEdit"))
+        {
+            IsTrusted = false,
+        };
+        var service = new MacForegroundTargetService(native);
+
+        PlatformPermissionException exception = await Assert.ThrowsAsync<
+            PlatformPermissionException>(() =>
+                service.CaptureAsync(CancellationToken.None));
+
+        Assert.Equal("Accessibility", exception.Permission);
+    }
+
+    [Fact]
+    public async Task ForegroundTarget_FallsBackToFocusedWindowIdentity()
     {
         var service = new MacForegroundTargetService(
             new FakeForegroundApi(new(
                 42,
+                0,
+                100,
+                "TextEdit",
+                "com.apple.TextEdit")));
+
+        ForegroundTarget captured = await service.CaptureAsync(
+            CancellationToken.None);
+
+        Assert.Equal("0000002A:W:0000000000000064", captured.Id);
+    }
+
+    [Fact]
+    public async Task ForegroundTarget_RejectsMissingFocusedControlAndWindow()
+    {
+        var service = new MacForegroundTargetService(
+            new FakeForegroundApi(new(
+                42,
+                0,
                 0,
                 "TextEdit",
                 "com.apple.TextEdit")));
@@ -45,7 +85,7 @@ public sealed class MacForegroundAndSelectionTests
         var native = new FakeSelectedTextApi("selected text");
         var service = new MacSelectedTextService(native);
         var target = new ForegroundTarget(
-            "0000002A:0000000000000064",
+            "0000002A:E:0000000000000064",
             "TextEdit",
             "com.apple.TextEdit");
 
@@ -66,9 +106,18 @@ public sealed class MacForegroundAndSelectionTests
     private sealed class FakeForegroundApi(MacForegroundSnapshot snapshot)
         : IMacForegroundApi
     {
+        public bool IsTrusted { get; set; } = true;
+
         public MacForegroundSnapshot Snapshot { get; set; } = snapshot;
 
-        public MacForegroundSnapshot Capture() => Snapshot;
+        public bool IsAccessibilityTrusted() => IsTrusted;
+
+        public MacForegroundSnapshot Capture(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Snapshot;
+        }
     }
 
     private sealed class FakeSelectedTextApi(string? text) : IMacSelectedTextApi

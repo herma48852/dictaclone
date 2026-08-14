@@ -49,6 +49,13 @@ the remaining optional/cross-machine matrix are deferred; they do not block the
 declared local target. Future direct distribution would require a Developer ID
 Application certificate and Apple notarization.
 
+On August 14, version 0.1.3 changed foreground capture to create the frontmost
+application's Accessibility element directly from its `NSWorkspace` process
+ID. It prefers the focused control and falls back to the focused or main window
+when Chromium does not expose that control, while retaining target-change
+rejection. The installed signed build then accepted live dictation in both the
+Google Gemini and ChatGPT message editors in Google Chrome.
+
 ## Supported target
 
 - macOS 14 Sonoma or newer.
@@ -237,7 +244,7 @@ Build and verify a development bundle for the current or named architecture:
 ```zsh
 ./scripts/macos/build-app.sh
 ./scripts/macos/build-app.sh osx-x64
-./scripts/macos/verify-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
+./scripts/macos/verify-app.sh artifacts/macos/0.1.3/osx-arm64/DictaClone.app
 ```
 
 With no identity configured, `build-app.sh` uses an ad-hoc signature for local
@@ -262,8 +269,8 @@ export DICTACLONE_CODESIGN_IDENTITY='Developer ID Application: Example (TEAMID)'
 xcrun notarytool store-credentials DictaCloneNotary
 export DICTACLONE_NOTARY_PROFILE='DictaCloneNotary'
 ./scripts/macos/build-app.sh osx-arm64
-./scripts/macos/notarize-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
-./scripts/macos/verify-app.sh artifacts/macos/0.1.2/osx-arm64/DictaClone.app
+./scripts/macos/notarize-app.sh artifacts/macos/0.1.3/osx-arm64/DictaClone.app
+./scripts/macos/verify-app.sh artifacts/macos/0.1.3/osx-arm64/DictaClone.app
 ```
 
 `sign-app.sh` signs nested Mach-O files from the inside out and intentionally
@@ -276,6 +283,11 @@ staples the ticket, and validates it. The release command builds both
 architectures and creates a combined checksum file. When both release
 environment variables shown above are set, it also notarizes, staples, and
 repackages each architecture before calculating the final checksums:
+
+An Apple Development identity may be supplied without a notary profile for a
+stable local qualification release. The release remains non-distributable and
+the verification script explicitly skips Gatekeeper assessment for that
+development-only certificate class.
 
 ```zsh
 ./scripts/macos/new-release.sh
@@ -353,6 +365,10 @@ refreshing LaunchServices metadata, Launcher displayed the full DictaClone
 application icon; the separate small menu-bar image continued to identify the
 running agent. The complete `scripts/macos/test.sh` suite then passed in a
 normal Terminal session.
+The August 14 signed 0.1.3 upgrade retained its existing permissions. A
+privacy-safe foreground probe confirmed that the system-wide focused-element
+query returned a transient Accessibility failure while direct application
+lookup still returned a stable Chrome window identity.
 
 This accepts the declared personal Apple Silicon target. Cancellation,
 permission revocation, rich-text restoration, Intel hardware, Developer ID,
@@ -366,7 +382,7 @@ gates only if the target expands to broader or public distribution.
 | 0: boundary and toolchain decision | Implemented | Avalonia/native adapter architecture and pinned packages |
 | 1: shared extraction | Implemented | `DictaClone.Desktop`, shared input/error contracts, cross-platform paths |
 | 2: shell and lifecycle | Implemented; primary lifecycle accepted on Apple Silicon | menu-bar app, settings, history, overlay, and first run implemented; two forced bundle opens left one process; validated LaunchAgent launched the installed app and was removed cleanly when disabled; broader shutdown stress remains |
-| 3: hotkeys, permissions, foreground | Implemented; keyboard and dedicated Volume Down hold/release paths plus target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; the global default shortcut and single-key `VolumeDown` binding worked; the bound media key did not change system volume; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
+| 3: hotkeys, permissions, foreground | Implemented; keyboard and dedicated Volume Down hold/release paths plus target-change rejection accepted on Apple Silicon | stable signed bundle authorized for Microphone and Accessibility; the global default shortcut and single-key `VolumeDown` binding worked; the bound media key did not change system volume; direct application Accessibility lookup fixed Gemini and ChatGPT editor capture; switching from TextEdit to a browser before release inserted nowhere; denial/revocation matrix remains |
 | 4: audio and local speech | Implemented; live, quiet-speech, and offline paths accepted on Apple Silicon | live Core Audio capture and local transcription succeeded, including deliberately quiet speech after schema-5 migration and an offline restart; device, silence-error, cancellation, and Intel checks remain |
 | 5: safe insertion and selected text | Implemented; primary targets and clipboard ownership safety accepted | Paste Mode inserted into TextEdit, native GNU Emacs, a browser field, and Terminal, restored an owned clipboard sentinel, and preserved a concurrent external change; Typing Mode left the sentinel untouched; changed-target insertion was rejected; rich text, cancellation, and selected-text checks remain |
 | 6: persistence and Smart Edit | Implemented | shared stores, LaunchAgent, Keychain, diagnostics/support bundle |

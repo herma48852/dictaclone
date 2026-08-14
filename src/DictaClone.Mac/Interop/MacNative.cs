@@ -48,6 +48,9 @@ internal static partial class MacNative
     internal static partial nint AXUIElementCreateSystemWide();
 
     [LibraryImport(ApplicationServices)]
+    internal static partial nint AXUIElementCreateApplication(int processId);
+
+    [LibraryImport(ApplicationServices)]
     internal static partial int AXUIElementCopyAttributeValue(
         nint element,
         nint attribute,

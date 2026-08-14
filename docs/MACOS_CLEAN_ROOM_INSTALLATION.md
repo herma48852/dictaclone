@@ -9,6 +9,11 @@ builders install the .NET SDK, Git, and full Xcode.
 An internet connection is required for the first verified speech-model
 download. Ordinary dictation works offline after the selected model is present.
 
+The current development-signed macOS qualification archives are attached to
+the [DictaClone 0.1.3 prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.3).
+They are intended for local compatibility testing and are not notarized for
+general direct distribution.
+
 ## Build from source on Apple Silicon
 
 This is the supported way for another Mac owner to build DictaClone for
@@ -99,7 +104,7 @@ Open the generated directory, using the version printed by the build. For the
 current version:
 
 ```zsh
-open artifacts/macos/0.1.2/osx-arm64
+open artifacts/macos/0.1.3/osx-arm64
 ```
 
 Drag `DictaClone.app` into **Applications** before launching it. Then continue

@@ -7,11 +7,12 @@ version=$(/usr/bin/sed -n 's:.*<VersionPrefix>\([^<]*\)</VersionPrefix>.*:\1:p' 
 release_root="$repo_root/artifacts/macos/$version"
 notarize_release=false
 
-if [[ -n ${DICTACLONE_CODESIGN_IDENTITY:-} || -n ${DICTACLONE_NOTARY_PROFILE:-} ]]; then
-  if [[ -z ${DICTACLONE_CODESIGN_IDENTITY:-} || -z ${DICTACLONE_NOTARY_PROFILE:-} ]]; then
-    print -u2 "Set both DICTACLONE_CODESIGN_IDENTITY and DICTACLONE_NOTARY_PROFILE, or neither"
+if [[ -n ${DICTACLONE_NOTARY_PROFILE:-} ]]; then
+  if [[ -z ${DICTACLONE_CODESIGN_IDENTITY:-} ]]; then
+    print -u2 "DICTACLONE_NOTARY_PROFILE requires DICTACLONE_CODESIGN_IDENTITY"
     exit 64
   fi
+
   notarize_release=true
 fi
 
@@ -29,7 +30,10 @@ if $notarize_release; then
       -c -k --sequesterRsrc --keepParent \
       "$app_path" \
       "$archive_path"
-    /usr/bin/shasum -a 256 "$archive_path" > "$archive_path.sha256"
+    (
+      cd "${archive_path:h}"
+      /usr/bin/shasum -a 256 "${archive_path:t}"
+    ) > "$archive_path.sha256"
   done
 
   "$script_dir/verify-app.sh" "$release_root/osx-arm64/DictaClone.app"

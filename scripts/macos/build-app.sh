@@ -104,7 +104,10 @@ fi
 
 "$script_dir/sign-app.sh" "$app_path" "${DICTACLONE_CODESIGN_IDENTITY:--}"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
-/usr/bin/shasum -a 256 "$archive_path" > "$archive_path.sha256"
+(
+  cd "$artifact_root"
+  /usr/bin/shasum -a 256 "${archive_path:t}"
+) > "$archive_path.sha256"
 
 print "$app_path"
 print "$archive_path"

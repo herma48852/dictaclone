@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using DictaClone.Core.Dictation;
 using DictaClone.Mac.Audio;
+using DictaClone.Mac.Foreground;
 using DictaClone.Mac.Lifecycle;
 using DictaClone.Mac.Permissions;
 
@@ -14,6 +16,17 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        int foregroundProbeArgument = Array.FindIndex(
+            args,
+            value => string.Equals(
+                value,
+                "--foreground-probe-delay",
+                StringComparison.OrdinalIgnoreCase));
+        if (foregroundProbeArgument >= 0)
+        {
+            return RunForegroundProbe(args, foregroundProbeArgument);
+        }
+
         bool smokeTest = args.Contains(
             "--smoke-test",
             StringComparer.OrdinalIgnoreCase);
@@ -91,4 +104,57 @@ internal static class Program
         Console.WriteLine("DictaClone macOS packaged-app smoke test passed.");
         return 0;
     }
+
+    private static int RunForegroundProbe(string[] args, int argumentIndex)
+    {
+        if (argumentIndex + 1 >= args.Length ||
+            !double.TryParse(
+                args[argumentIndex + 1],
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double delaySeconds) ||
+            delaySeconds is < 0 or > 30)
+        {
+            Console.Error.WriteLine(
+                "--foreground-probe-delay requires a value from 0 to 30 seconds.");
+            return 64;
+        }
+
+        Task.Delay(TimeSpan.FromSeconds(delaySeconds))
+            .GetAwaiter()
+            .GetResult();
+        MacForegroundProbeResult result = MacForegroundProbe.Capture();
+        Console.WriteLine(
+            $"AccessibilityTrusted={result.AccessibilityTrusted}");
+        Console.WriteLine(
+            $"SystemElementAvailable={result.SystemElementAvailable}");
+        WriteProbeAttribute(result.FocusedApplication);
+        foreach (MacForegroundProbeEntry attribute in result.Attributes)
+        {
+            WriteProbeAttribute(attribute);
+        }
+
+        try
+        {
+            ForegroundTarget target = new MacForegroundTargetService()
+                .CaptureAsync(CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+            Console.WriteLine(
+                $"Capture=Success Process={target.ProcessName} " +
+                $"Bundle={target.WindowClass} Target={target.Id}");
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine($"Capture=Failure Error={exception.GetType().Name}");
+        }
+
+        return 0;
+    }
+
+    private static void WriteProbeAttribute(
+        MacForegroundProbeEntry attribute) =>
+        Console.WriteLine(
+            $"Source={attribute.Source} Attribute={attribute.Attribute} " +
+            $"CopyError={attribute.CopyError} PidError={attribute.PidError} " +
+            $"Pid={attribute.ProcessId} Hash={attribute.Hash:X16}");
 }

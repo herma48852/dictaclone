@@ -3,7 +3,7 @@
     <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <VersionPrefix>0.1.2</VersionPrefix>
+    <VersionPrefix>0.1.3</VersionPrefix>
     <Product>DictaClone</Product>
     <Company>DictaClone contributors</Company>
     <Authors>DictaClone contributors</Authors>

@@ -91,6 +91,9 @@ The owner has accepted this Apple Silicon build for personal use on the
 qualification Mac. Public macOS distribution is not currently required, so the
 remaining optional matrix, Developer ID identity, Intel-hardware run, and Apple
 notarization are explicitly deferred.
+On August 14, 2026, version 0.1.3 corrected Chromium foreground-target capture;
+the installed signed build then accepted live dictation in both Google Gemini
+and ChatGPT message editors in Google Chrome.
 
 See the [Windows clean-room installation and use guide](docs/CLEAN_ROOM_INSTALLATION.md)
 for downloading the qualified GitHub release assets, checksum verification,
@@ -101,6 +104,8 @@ See the [macOS porting guide](docs/MACOS_PORTING_GUIDE.md) for the implemented
 architecture, milestone record, developer commands, and remaining qualification
 gates. The [macOS clean-room guide](docs/MACOS_CLEAN_ROOM_INSTALLATION.md) covers
 installation, permissions, offline use, acceptance, and removal.
+Development-signed 0.1.3 qualification archives are available from the
+[macOS compatibility prerelease](https://github.com/herma48852/dictaclone/releases/tag/v0.1.3).
 
 ## Platforms
 
