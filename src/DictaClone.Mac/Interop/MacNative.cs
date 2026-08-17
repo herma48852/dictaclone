@@ -15,6 +15,8 @@ internal static partial class MacNative
     internal const string CoreGraphics =
         "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics";
     internal const string ObjectiveC = "/usr/lib/libobjc.A.dylib";
+    internal const string Security =
+        "/System/Library/Frameworks/Security.framework/Security";
     internal const string PermissionShim = "DictaClonePermissions";
 
     [LibraryImport(ObjectiveC, StringMarshalling = StringMarshalling.Utf8)]
@@ -31,6 +33,37 @@ internal static partial class MacNative
 
     [LibraryImport(CoreFoundation)]
     internal static partial nuint CFHash(nint value);
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial nuint CFGetTypeID(nint value);
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial nuint CFDataGetTypeID();
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial nint CFDataGetLength(nint data);
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial nint CFDataGetBytePtr(nint data);
+
+    [LibraryImport(CoreFoundation)]
+    internal static unsafe partial nint CFDataCreate(
+        nint allocator,
+        byte* bytes,
+        nint length);
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial nint CFDictionaryCreateMutable(
+        nint allocator,
+        nint capacity,
+        nint keyCallbacks,
+        nint valueCallbacks);
+
+    [LibraryImport(CoreFoundation)]
+    internal static partial void CFDictionarySetValue(
+        nint dictionary,
+        nint key,
+        nint value);
 
     [LibraryImport(
         CoreFoundation,
@@ -60,6 +93,22 @@ internal static partial class MacNative
     internal static partial int AXUIElementGetPid(
         nint element,
         out int processId);
+
+    [LibraryImport(Security)]
+    internal static partial int SecItemCopyMatching(
+        nint query,
+        out nint result);
+
+    [LibraryImport(Security)]
+    internal static partial int SecItemAdd(nint attributes, nint result);
+
+    [LibraryImport(Security)]
+    internal static partial int SecItemUpdate(
+        nint query,
+        nint attributes);
+
+    [LibraryImport(Security)]
+    internal static partial int SecItemDelete(nint query);
 
     [LibraryImport(CoreGraphics)]
     [return: MarshalAs(UnmanagedType.I1)]

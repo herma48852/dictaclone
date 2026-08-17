@@ -352,7 +352,7 @@ public sealed class LiveDictationController : IAsyncDisposable
             {
                 Post(() => _overlay.ShowStatus(
                     OverlayStatus.Processing,
-                    "Applying Smart Edit securelyâ€¦"));
+                    "Applying Smart Edit securely…"));
                 finalText = await _smartEdit.EditAsync(
                     new SmartEditRequest(
                         instruction,

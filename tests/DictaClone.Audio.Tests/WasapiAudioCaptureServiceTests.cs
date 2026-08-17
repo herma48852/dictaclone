@@ -107,6 +107,35 @@ public sealed class WasapiAudioCaptureServiceTests
     }
 
     [Fact]
+    public async Task Capture_ReportsNativeStereoFloatLevels()
+    {
+        WaveFormat format = WaveFormat.CreateIeeeFloatWaveFormat(
+            sampleRate: 48_000,
+            channels: 2);
+        var native = new FakeNativeCapture(format);
+        var service = new WasapiAudioCaptureService(
+            new FakeCaptureFactory(native));
+        await using IAudioCaptureSession session = await service.StartAsync(
+            DefaultSettings,
+            CancellationToken.None);
+        var levels = new List<AudioLevelChangedEvent>();
+        ((IAudioLevelSource)session).LevelChanged +=
+            (_, level) => levels.Add(level);
+
+        native.Emit(CreateFloat32Stereo(
+            frameCount: 12_000,
+            left: 0.5f,
+            right: 0.25f));
+        CapturedAudio audio = await session.StopAsync(CancellationToken.None);
+
+        AudioLevelChangedEvent level = Assert.Single(levels);
+        Assert.InRange(level.RootMeanSquare, 0.374, 0.376);
+        Assert.InRange(level.Peak, 0.374, 0.376);
+        Assert.False(audio.IsSilent);
+        Assert.InRange(audio.Pcm16.Length, 7_800, 8_200);
+    }
+
+    [Fact]
     public async Task Stop_DoesNotBlockFinalCaptureCallbackOnSessionLock()
     {
         var native = new FakeNativeCapture
@@ -273,6 +302,27 @@ public sealed class WasapiAudioCaptureServiceTests
         return bytes;
     }
 
+    private static byte[] CreateFloat32Stereo(
+        int frameCount,
+        float left,
+        float right)
+    {
+        var bytes = new byte[frameCount * 2 * sizeof(float)];
+        for (int frame = 0; frame < frameCount; frame++)
+        {
+            BitConverter.TryWriteBytes(
+                bytes.AsSpan(frame * 2 * sizeof(float), sizeof(float)),
+                left);
+            BitConverter.TryWriteBytes(
+                bytes.AsSpan(
+                    (frame * 2 + 1) * sizeof(float),
+                    sizeof(float)),
+                right);
+        }
+
+        return bytes;
+    }
+
     private sealed class FakeCaptureFactory(
         params FakeNativeCapture[] captures) : INativeAudioCaptureFactory
     {
@@ -306,8 +356,17 @@ public sealed class WasapiAudioCaptureServiceTests
         private readonly TaskCompletionSource _releaseStop = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public WaveFormat WaveFormat { get; } =
-            new(16_000, bits: 16, channels: 1);
+        public FakeNativeCapture()
+            : this(new WaveFormat(16_000, bits: 16, channels: 1))
+        {
+        }
+
+        public FakeNativeCapture(WaveFormat waveFormat)
+        {
+            WaveFormat = waveFormat;
+        }
+
+        public WaveFormat WaveFormat { get; }
 
         public int StartCount { get; private set; }
 

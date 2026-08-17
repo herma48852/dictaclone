@@ -108,6 +108,7 @@ public sealed class OpenAiResponsesSmartEditProvider : ISmartEditProvider
     private static HttpRequestMessage CreateRequest(SmartEditRequest request,
         string apiKey)
     {
+        SmartEditPrompt prompt = SmartEditPromptBuilder.Build(request);
         var message = new HttpRequestMessage(
             HttpMethod.Post,
             request.ProviderSettings.Endpoint);
@@ -116,8 +117,8 @@ public sealed class OpenAiResponsesSmartEditProvider : ISmartEditProvider
             apiKey.Trim());
         message.Content = JsonContent.Create(new ResponsesRequest(
             request.ProviderSettings.Model.Trim(),
-            SmartEditPromptBuilder.BuildInstructions(request),
-            SmartEditPromptBuilder.BuildInput(request),
+            prompt.Instructions,
+            prompt.Input,
             Store: false,
             new ReasoningOptions("low")));
         return message;

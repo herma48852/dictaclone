@@ -80,6 +80,7 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly CancellationTokenSource _durationCancellation = new();
         private readonly long _maximumBytes;
+        private readonly NativeAudioLevelMeter? _levelMeter;
         private Task? _durationTask;
         private Task<CapturedAudio>? _stopTask;
         private bool _discardAudio;
@@ -95,6 +96,13 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
             _maximumBytes = GetMaximumBytes(
                 capture.WaveFormat,
                 settings.MaximumDuration);
+            if (NativeAudioLevelMeter.TryCreate(
+                    capture.WaveFormat,
+                    out NativeAudioLevelMeter levelMeter))
+            {
+                _levelMeter = levelMeter;
+            }
+
             _capture.DataAvailable += CaptureDataAvailable;
             _capture.RecordingStopped += CaptureRecordingStopped;
         }
@@ -379,17 +387,14 @@ public sealed class WasapiAudioCaptureService : IAudioCaptureService
 
         private void PublishLevel(ReadOnlyMemory<byte> nativeAudio)
         {
+            if (_levelMeter is not NativeAudioLevelMeter meter)
+            {
+                return;
+            }
+
             try
             {
-                CapturedAudio converted =
-                    PcmAudioConverter.ConvertToWhisperPcm16(
-                        nativeAudio,
-                        _capture.WaveFormat,
-                        silenceThreshold: 0,
-                        minimumSpeechDuration: TimeSpan.Zero);
-                AudioSignalMetrics metrics =
-                    PcmAudioConverter.MeasureWhisperPcm16(
-                        converted.Pcm16.Span);
+                AudioSignalMetrics metrics = meter.Measure(nativeAudio.Span);
                 Delegate[] handlers = LevelChanged?.GetInvocationList() ?? [];
 
                 foreach (Delegate handler in handlers)

@@ -700,7 +700,7 @@ public sealed class AppController : IAsyncDisposable
                     SmartEdit = eventArgs.Settings,
                     Hotkeys = hotkeys,
                 },
-                "âœ“  Smart Edit settings saved");
+                "✓  Smart Edit settings saved");
             if (!applied && credentialChanged)
             {
                 await RestoreSmartEditSecretAsync(priorSecret);

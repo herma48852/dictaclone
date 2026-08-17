@@ -101,6 +101,19 @@ public sealed class MacForegroundAndSelectionTests
             snapshot!,
             target,
             CancellationToken.None));
+        Assert.Equal([target.Id, target.Id, target.Id], native.TargetIds);
+    }
+
+    [Fact]
+    public void Selection_UsesProcessIdFromCapturedForegroundTarget()
+    {
+        Assert.True(NativeMacSelectedTextApi.TryGetProcessId(
+            "0000002A:E:0000000000000064",
+            out int processId));
+        Assert.Equal(42, processId);
+        Assert.False(NativeMacSelectedTextApi.TryGetProcessId(
+            "not-a-target",
+            out _));
     }
 
     private sealed class FakeForegroundApi(MacForegroundSnapshot snapshot)
@@ -124,6 +137,15 @@ public sealed class MacForegroundAndSelectionTests
     {
         public string? Text { get; set; } = text;
 
-        public string? GetSelectedText() => Text;
+        public List<string> TargetIds { get; } = [];
+
+        public string? GetSelectedText(
+            ForegroundTarget target,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TargetIds.Add(target.Id);
+            return Text;
+        }
     }
 }

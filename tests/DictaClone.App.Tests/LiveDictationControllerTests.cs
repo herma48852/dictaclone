@@ -527,13 +527,14 @@ public sealed class LiveDictationControllerTests
                 Enabled = true,
             },
         };
+        var overlay = new FakeOverlay();
         await using var controller = new LiveDictationController(
             new FakeCaptureService(new FakeCaptureSession(CreateSpeechAudio())),
             new FakeTranscriptionEngine("make this concise"),
             new FakeTextProcessor(text => text),
             foreground,
             insertion,
-            new FakeOverlay(),
+            overlay,
             settings,
             smartEdit: provider,
             selectedText: selection);
@@ -549,6 +550,7 @@ public sealed class LiveDictationControllerTests
         Assert.Equal("make this concise", provider.Request.Instruction);
         Assert.Equal("wordy original", provider.Request.SelectedText);
         Assert.Equal(foreground.Target.ProcessName, provider.Request.ProcessName);
+        Assert.Contains("Applying Smart Edit securely…", overlay.Messages);
     }
 
     [Fact]

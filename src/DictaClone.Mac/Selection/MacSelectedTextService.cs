@@ -21,19 +21,21 @@ public sealed class MacSelectedTextService : ISelectedTextService
         _native = native ?? throw new ArgumentNullException(nameof(native));
     }
 
-    public Task<SelectedTextSnapshot?> CaptureAsync(
+    public async Task<SelectedTextSnapshot?> CaptureAsync(
         ForegroundTarget target,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
-        string? text = _native.GetSelectedText();
-        return Task.FromResult(string.IsNullOrEmpty(text)
+        string? text = await Task.Run(
+            () => _native.GetSelectedText(target, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrEmpty(text)
             ? null
-            : new SelectedTextSnapshot(text, CreateFingerprint(text, target.Id)));
+            : new SelectedTextSnapshot(text, CreateFingerprint(text, target.Id));
     }
 
-    public Task<bool> RevalidateAsync(
+    public async Task<bool> RevalidateAsync(
         SelectedTextSnapshot snapshot,
         ForegroundTarget target,
         CancellationToken cancellationToken)
@@ -41,18 +43,20 @@ public sealed class MacSelectedTextService : ISelectedTextService
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
-        string? current = _native.GetSelectedText();
+        string? current = await Task.Run(
+            () => _native.GetSelectedText(target, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
         if (current is null)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         byte[] expected = Convert.FromHexString(snapshot.Fingerprint);
         byte[] actual = Convert.FromHexString(
             CreateFingerprint(current, target.Id));
-        return Task.FromResult(CryptographicOperations.FixedTimeEquals(
+        return CryptographicOperations.FixedTimeEquals(
             expected,
-            actual));
+            actual);
     }
 
     private static string CreateFingerprint(string text, string targetId) =>
@@ -62,15 +66,25 @@ public sealed class MacSelectedTextService : ISelectedTextService
 
 internal interface IMacSelectedTextApi
 {
-    string? GetSelectedText();
+    string? GetSelectedText(
+        ForegroundTarget target,
+        CancellationToken cancellationToken);
 }
 
 internal sealed class NativeMacSelectedTextApi : IMacSelectedTextApi
 {
-    public string? GetSelectedText()
+    public string? GetSelectedText(
+        ForegroundTarget target,
+        CancellationToken cancellationToken)
     {
-        nint system = MacNative.AXUIElementCreateSystemWide();
-        if (system == nint.Zero)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryGetProcessId(target.Id, out int processId))
+        {
+            return null;
+        }
+
+        nint application = MacNative.AXUIElementCreateApplication(processId);
+        if (application == nint.Zero)
         {
             return null;
         }
@@ -78,8 +92,9 @@ internal sealed class NativeMacSelectedTextApi : IMacSelectedTextApi
         try
         {
             nint focused = NativeMacForegroundApi.CopyAttribute(
-                system,
-                "AXFocusedUIElement");
+                application,
+                "AXFocusedUIElement",
+                cancellationToken);
             if (focused == nint.Zero)
             {
                 return null;
@@ -87,9 +102,16 @@ internal sealed class NativeMacSelectedTextApi : IMacSelectedTextApi
 
             try
             {
+                if (MacNative.AXUIElementGetPid(focused, out int focusedPid) != 0 ||
+                    focusedPid != processId)
+                {
+                    return null;
+                }
+
                 nint selected = NativeMacForegroundApi.CopyAttribute(
                     focused,
-                    "AXSelectedText");
+                    "AXSelectedText",
+                    cancellationToken);
                 if (selected == nint.Zero)
                 {
                     return null;
@@ -111,7 +133,20 @@ internal sealed class NativeMacSelectedTextApi : IMacSelectedTextApi
         }
         finally
         {
-            MacNative.CFRelease(system);
+            MacNative.CFRelease(application);
         }
+    }
+
+    internal static bool TryGetProcessId(string targetId, out int processId)
+    {
+        processId = 0;
+        int separator = targetId.IndexOf(':');
+        return separator == 8 &&
+            int.TryParse(
+                targetId.AsSpan(0, separator),
+                System.Globalization.NumberStyles.HexNumber,
+                provider: null,
+                out processId) &&
+            processId > 0;
     }
 }
